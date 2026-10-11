@@ -224,6 +224,21 @@
     },
     "notes": {
       "type": "string"
+    },
+    "executedBy": {
+      "type": "object",
+      "description": "Written by the replay runner only: this result comes from replaying a library script, not from an agent.",
+      "properties": {
+        "mode": {
+          "const": "replay"
+        },
+        "script": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      }
     }
   }
 }

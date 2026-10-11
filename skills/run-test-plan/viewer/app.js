@@ -1,6 +1,7 @@
 import { annotatedUrl, openEditor } from './annotate.js';
 import { createChat } from './chat.js';
 import { createDashboard, fmtUsd } from './dashboard.js';
+import { createLibrary } from './library.js';
 
 const STATUSES = ['pass', 'fail', 'blocked', 'skipped', 'running', 'pending'];
 const REVIEWS = [
@@ -85,6 +86,31 @@ function parseHash() {
   return match ? { runId: decodeURIComponent(match[1]), tcId: match[2] ? decodeURIComponent(match[2]) : null } : {};
 }
 
+// #/tests, #/plans and #/plan/<id> are the test library's views.
+function libraryRoute() {
+  if (/^#\/tests\/?$/.test(location.hash)) return { view: 'tests' };
+  if (/^#\/plans\/?$/.test(location.hash)) return { view: 'plans' };
+  const plan = /^#\/plan\/([^/]+)/.exec(location.hash);
+  return plan ? { view: 'plan', id: decodeURIComponent(plan[1]) } : null;
+}
+
+function setNav(view) {
+  for (const link of document.querySelectorAll('.top-nav a'))
+    link.setAttribute('aria-current', String(link.dataset.nav === view));
+}
+
+function showLibrary(route) {
+  dashboard.hide();
+  clearTimeout(state.timer);
+  chat.close?.();
+  state.view = 'library';
+  document.body.dataset.view = 'library';
+  $('#run-select').value = '';
+  $('#live').hidden = true;
+  setNav(route.view === 'tests' ? 'tests' : 'plans');
+  return library.show(route).catch((error) => toast(error.message, true));
+}
+
 function setHash() {
   if (state.view !== 'run') return;
   const next = `#/run/${encodeURIComponent(state.runId)}${state.tcId ? `/tc/${encodeURIComponent(state.tcId)}` : ''}`;
@@ -107,6 +133,7 @@ async function loadRuns() {
           return `<option value="${esc(r.id)}">${esc(`${r.id}${r.label ? ` · ${r.label}` : ''} — ${parts.filter(Boolean).join(', ')}`)}</option>`;
         })
         .join('');
+  $('#run-select').value = state.view === 'run' ? state.runId || '' : '';
 }
 
 function showDashboard() {
@@ -114,6 +141,7 @@ function showDashboard() {
   clearTimeout(state.timer);
   chat.close?.();
   document.body.dataset.view = 'dashboard';
+  setNav('dashboard');
   $('#run-select').value = '';
   $('#live').hidden = true;
   if (location.hash && location.hash !== '#/') history.replaceState(null, '', '#/');
@@ -125,6 +153,7 @@ function showRun(runId, tcId = null) {
   dashboard.hide();
   state.view = 'run';
   document.body.dataset.view = 'run';
+  setNav('run');
   if (runId !== state.runId) state.drafts.clear();
   state.runId = runId;
   state.tcId = tcId;
@@ -297,6 +326,9 @@ function renderHeader() {
     meta.createdAt && esc(fmtDate(meta.createdAt)),
     meta.recordAll && 'recording on',
     meta.retestOf && `retest of <span class="mono">${esc(meta.retestOf)}</span>`,
+    meta.mode === 'replay' &&
+      `<span class="badge replay-badge" title="Replayed from the test library without an agent">${icon('refresh')}Deterministic</span>${meta.suite ? ` <a href="#/plan/${encodeURIComponent(meta.suite.id)}">${esc(meta.suite.name)}</a>${(meta.suite.tags || []).map((t) => ` <span class="tag">${esc(t)}</span>`).join('')}` : ''}`,
+    meta.healOf && `repairs <a class="mono" href="#/run/${encodeURIComponent(meta.healOf)}">${esc(meta.healOf)}</a>`,
     state.run.cost?.totalUsd != null &&
       `<span title="API list-price equivalent${state.run.cost.estimated ? ', partly estimated' : ''}">${state.run.cost.estimated ? '≈ ' : ''}${esc(fmtUsd(state.run.cost.totalUsd))}</span>`,
   ].filter(Boolean);
@@ -307,6 +339,7 @@ function renderHeader() {
     <div>
       <h1>${esc(plan.title)}</h1>
       <div class="run-meta">${meta_.map((m) => `<span>${m}</span>`).join('')}</div>
+      ${(meta.warnings || []).length ? `<ul class="run-warnings">${meta.warnings.map((w) => `<li>${icon('warn')}${esc(w)}</li>`).join('')}</ul>` : ''}
     </div>
     <div class="stats">
       ${stat('pass', 'Pass', counts.pass || 0)}
@@ -424,6 +457,7 @@ function duration(result) {
 // Which model gave this verdict; an escalated case says the cheaper model's verdict was re-checked.
 function executedBy(by) {
   if (!by) return '';
+  if (by.mode === 'replay') return `replay of ${by.script} v${by.version} (no agent)`;
   const model = `${by.model}${by.effort ? ` · ${by.effort}` : ''} (${by.tier})`;
   return by.escalatedFrom ? `${model}, re-run after ${by.escalatedFrom}: ${by.reason || 'needed a second look'}` : model;
 }
@@ -448,7 +482,7 @@ function renderDetail() {
     ...Object.entries({ ...(tc.variants || {}), ...(env.variants || {}) }).map(([k, v]) => [variantLabel(k), v]),
     ...Object.entries(env.versions || {}).map(([k, v]) => [`${targetLabel(k)} version`, v]),
     ['Duration', duration(result)],
-    ['Agent', executedBy(tc.executedBy)],
+    [tc.executedBy?.mode === 'replay' ? 'Executed by' : 'Agent', executedBy(tc.executedBy)],
     ['Evidence', tc.files.length ? `${tc.files.length} file${tc.files.length > 1 ? 's' : ''}` : ''],
   ].filter(([, v]) => v);
   const sections = [
@@ -480,7 +514,21 @@ function renderDetail() {
 
     ${
       tc.status === 'running' || tc.status === 'pending'
-        ? `<div class="callout info">${icon(tc.status)}<div><strong>${tc.status === 'running' ? 'A Test Agent is executing this case' : 'Waiting for a Test Agent'}</strong>${esc(tc.progress?.note || '')} <span class="saved">${esc(fmtDate(tc.progress?.at))}</span></div></div>`
+        ? `<div class="callout info">${icon(tc.status)}<div><strong>${
+            state.run.meta?.mode === 'replay'
+              ? tc.status === 'running'
+                ? 'Replaying the recorded script'
+                : 'Queued for replay'
+              : tc.status === 'running'
+                ? 'A Test Agent is executing this case'
+                : 'Waiting for a Test Agent'
+          }</strong>${esc(tc.progress?.note || '')} <span class="saved">${esc(fmtDate(tc.progress?.at))}</span></div></div>`
+        : ''
+    }
+    ${
+      tc.executedBy?.mode === 'replay' && ['fail', 'blocked'].includes(tc.status)
+        ? `<div class="callout info">${icon('refresh')}<div><strong>Deterministic replay of ${esc(tc.executedBy.script)} v${esc(tc.executedBy.version)}</strong>If the product regressed, report it. If the UI changed on purpose, a Test Agent re-records the script from the original steps.
+          <div class="callout-actions"><button type="button" class="btn primary" data-heal="${esc(tc.id)}">${icon('chat')}Repair with agent</button></div></div></div>`
         : ''
     }
     ${questionCards(tc)}
@@ -498,7 +546,7 @@ function renderDetail() {
     <div class="card">
       <div class="compare">
         <div><h4>Plan expects</h4><p>${esc(tc.expected)}</p></div>
-        <div><h4>Agent reports</h4><p>${result ? esc(result.summary) : '<span class="missing">No result yet.</span>'}</p></div>
+        <div><h4>${tc.executedBy?.mode === 'replay' ? 'Replay reports' : 'Agent reports'}</h4><p>${result ? esc(result.summary) : '<span class="missing">No result yet.</span>'}</p></div>
       </div>
     </div>
 
@@ -845,6 +893,33 @@ function applyTheme(theme) {
   $('#theme').setAttribute('aria-label', theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
 }
 
+// Prepares a Test Agent run of one failed replay case; launching the agent stays with Claude Code.
+async function heal(tcId, button) {
+  button.disabled = true;
+  try {
+    const { runId, prompt } = await api(`/api/runs/${encodeURIComponent(state.runId)}/heal/${encodeURIComponent(tcId)}`, { method: 'POST', body: '{}' });
+    $('#heal-run').href = `#/run/${encodeURIComponent(runId)}`;
+    $('#heal-run').textContent = runId;
+    $('#heal-prompt').value = prompt;
+    $('#heal-panel').showModal();
+    await loadRuns();
+  } catch (error) {
+    toast(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$('#heal-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('#heal-prompt').value);
+    toast('Copied: paste it in Claude Code');
+  } catch {
+    $('#heal-prompt').select();
+  }
+});
+$('#heal-run').addEventListener('click', () => $('#heal-panel').close());
+
 function showError(error) {
   $('#detail').innerHTML =
     `<div class="callout">${icon('warn')}<div><strong>Could not reach the viewer server</strong>${esc(error.message)}<br />Run <code>node .claude/skills/run-test-plan/scripts/qa-runs.mjs open</code>.</div></div>`;
@@ -862,10 +937,11 @@ document.addEventListener('click', async (event) => {
     return;
   }
   const target = event.target.closest(
-    '[data-tc],[data-status],[data-review],[data-verdict],[data-zoom],[data-edit],[data-ask],[data-lb],[data-marks-toggle],[data-mem-action],#open-chat,#open-memory,#refresh,#theme,#shortcuts,.lightbox-close,.lightbox-prev,.lightbox-next',
+    '[data-heal],[data-tc],[data-status],[data-review],[data-verdict],[data-zoom],[data-edit],[data-ask],[data-lb],[data-marks-toggle],[data-mem-action],#open-chat,#open-memory,#refresh,#theme,#shortcuts,.lightbox-close,.lightbox-prev,.lightbox-next',
   );
   if (!target) return;
   if (target.id === 'open-chat') return chat.open();
+  if (target.dataset.heal) return heal(target.dataset.heal, target);
   if (target.id === 'open-memory') {
     renderMemoryPanel();
     return $('#memory-panel').showModal();
@@ -998,6 +1074,8 @@ $('#run-select').addEventListener('change', (event) => {
 });
 
 window.addEventListener('hashchange', () => {
+  const route = libraryRoute();
+  if (route) return void showLibrary(route);
   const { runId, tcId } = parseHash();
   if (!runId) {
     if (state.view !== 'dashboard') showDashboard();
@@ -1012,6 +1090,17 @@ const dashboard = createDashboard({
   onOpenCase: (runId, tcId) => (location.hash = `#/run/${encodeURIComponent(runId)}/tc/${encodeURIComponent(tcId)}`),
 });
 
+const library = createLibrary({
+  host: $('#library'),
+  api,
+  icon,
+  toast,
+  onOpenRun: async (runId) => {
+    await loadRuns().catch(() => {});
+    location.hash = `#/run/${encodeURIComponent(runId)}`;
+  },
+});
+
 const chat = createChat({
   api,
   getContext: () => ({ runId: state.runId, tcId: state.tcId }),
@@ -1024,8 +1113,10 @@ const chat = createChat({
   applyTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
   try {
     await loadRuns();
+    const route = libraryRoute();
     const { runId, tcId } = parseHash();
-    if (runId && state.runs.some((r) => r.id === runId)) await showRun(runId, tcId);
+    if (route) await showLibrary(route);
+    else if (runId && state.runs.some((r) => r.id === runId)) await showRun(runId, tcId);
     else await showDashboard();
   } catch (error) {
     showError(error);

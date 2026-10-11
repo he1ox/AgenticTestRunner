@@ -141,6 +141,11 @@
         </span>
         <span class="brand-name">QA Test Runs</span>
       </a>
+      <nav class="top-nav" aria-label="Views">
+        <a href="#/" data-nav="dashboard">Dashboard</a>
+        <a href="#/tests" data-nav="tests">Tests</a>
+        <a href="#/plans" data-nav="plans">Test plans</a>
+      </nav>
       <label class="run-picker">
         <span class="sr-only">Run</span>
         <select id="run-select"></select>
@@ -174,6 +179,8 @@
 
     <section id="dashboard" class="dashboard" aria-label="Dashboard"></section>
 
+    <section id="library" class="dashboard library" aria-label="Test library"></section>
+
     <section id="run-header" class="run-header" aria-label="Run summary"></section>
 
     <main class="layout">
@@ -200,6 +207,21 @@
       <h2 id="memory-title">Memory</h2>
       <div id="memory-body"></div>
       <form method="dialog"><button class="btn">Close</button></form>
+    </dialog>
+
+    <dialog id="heal-panel" class="help heal-panel" aria-labelledby="heal-title">
+      <h2 id="heal-title">Repair with agent</h2>
+      <p>
+        Run <a id="heal-run" class="mono" href="#/"></a> is ready: one Test Agent will redo this case from its original
+        steps. Test Agents run in Claude Code, where the agent pool and the password live, so paste this there:
+      </p>
+      <label class="sr-only" for="heal-prompt">Prompt for Claude Code</label>
+      <textarea id="heal-prompt" rows="4" readonly></textarea>
+      <p class="meta">When the agent passes it, recording the batch saves its script as the next version of the same test.</p>
+      <form method="dialog" class="dialog-actions">
+        <button type="button" id="heal-copy" class="btn primary">Copy prompt</button>
+        <button class="btn">Close</button>
+      </form>
     </dialog>
 
     <dialog id="help" class="help" aria-labelledby="help-title">

@@ -1,5 +1,6 @@
 // Shared helpers for the run-test-plan CLI and viewer server: paths, run I/O, and the contract
 // checks that keep the Test Agent's result.json honest against the plan it was briefed from.
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,6 +45,8 @@ export const writeJson = (file, value) => {
 const DEFAULT_CONFIG = {
   runsDir: '.qa/runs',
   plansDir: '.qa/plans',
+  testsDir: '.qa/tests',
+  suitesDir: '.qa/suites',
   viewerPort: 4321,
   tracker: null,
   targets: { app: 'App under test', reference: 'Reference app' },
@@ -60,6 +63,8 @@ function loadConfig() {
 export const CONFIG = loadConfig();
 export const RUNS_DIR = resolve(PROJECT_ROOT, process.env.QA_RUNS_DIR || CONFIG.runsDir);
 export const PLANS_DIR = resolve(PROJECT_ROOT, CONFIG.plansDir);
+export const TESTS_DIR = resolve(PROJECT_ROOT, CONFIG.testsDir);
+export const SUITES_DIR = resolve(PROJECT_ROOT, CONFIG.suitesDir);
 export const PORT = Number(process.env.QA_VIEWER_PORT || CONFIG.viewerPort);
 
 // Paths inside the project are shown relative (short, portable briefs); plugin files live
@@ -98,6 +103,8 @@ export function listRuns() {
         planId: plan.id,
         title: plan.title,
         label: meta.label,
+        mode: meta.mode || 'agent',
+        suite: meta.suite?.id || null,
         createdAt: meta.createdAt || statSync(join(RUNS_DIR, id)).mtime.toISOString(),
         counts: countStatuses(loadRun(id)),
       };
@@ -143,7 +150,11 @@ export function loadRun(runId) {
       files,
       annotations,
       review: review[tc.id] || null,
-      executedBy: executed[tc.id] || null,
+      executedBy:
+        executed[tc.id] ||
+        (result?.executedBy?.mode === 'replay'
+          ? { mode: 'replay', script: result.executedBy.script, version: result.executedBy.version }
+          : null),
       warnings: [
         ...checkContract(tc, result, files, meta, evidenceDir, plan),
         ...(result?.blockedReason === 'needs-input' && !questions.length
@@ -227,6 +238,7 @@ export function dashboardData() {
       planId: run.plan.id,
       title: run.plan.title,
       label: run.meta.label || null,
+      mode: run.meta.mode || 'agent',
       createdAt: run.meta.createdAt,
       retestOf: run.meta.retestOf || null,
       cases: run.testCases.map((tc) => ({
@@ -314,3 +326,30 @@ export const stamp = (date = new Date()) => {
   const pad = (n) => String(n).padStart(2, '0');
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
 };
+
+export async function serverUp() {
+  try {
+    const response = await fetch(`http://127.0.0.1:${PORT}/api/health`, { signal: AbortSignal.timeout(1500) });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Starts the viewer server in the background unless it already answers. Captures and recordings
+// talk to it, so the replay runner needs it as much as the agents do.
+export async function ensureServer() {
+  if (await serverUp()) return true;
+  spawn(process.execPath, [join(SKILL_DIR, 'scripts', 'server.mjs')], {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+    cwd: PROJECT_ROOT,
+    env: { ...process.env, QA_PROJECT_DIR: PROJECT_ROOT },
+  }).unref();
+  for (let i = 0; i < 40; i += 1) {
+    if (await serverUp()) return true;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return false;
+}

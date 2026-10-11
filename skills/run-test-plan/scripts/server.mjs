@@ -3,8 +3,8 @@
 // folders (evidence), a small JSON API the viewer polls, reviewer verdicts, screenshot
 // annotations, the per-case agent chat, and the recording endpoints the Playwright MCP snippets
 // stream screencast frames to.
-import { spawnSync } from 'node:child_process';
-import { createReadStream, existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { createReadStream, existsSync, mkdirSync, openSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { basename, extname, join } from 'node:path';
 import { imageSize, readAnnotations, writeAnnotations } from './annotations.mjs';
@@ -12,9 +12,12 @@ import { chatState, resetChat, sendChat, stopChat } from './chat.mjs';
 import { addMemory, findMemory, loadMemories, removeMemory, updateMemory } from './memory.mjs';
 import { answerQuestion } from './questions.mjs';
 import { PRICING_AS_OF } from './pricing.mjs';
+import { prepareSuiteRun } from './replay.mjs';
+import { deleteSuite, listSuites, listTests, readSuite, reviewRecorded, saveSuite, updateTest } from './tests.mjs';
 import { runCost } from './usage.mjs';
 import {
   PORT,
+  PROJECT_ROOT,
   RUNS_DIR,
   REVIEW_VERDICTS,
   SKILL_DIR,
@@ -131,6 +134,9 @@ const route = async (req, res) => {
       return exportPng(req, res, runId, parts[4], parts[5]);
     if (resource === 'chat') return chat(req, res, runId, tcId, action);
     if (resource === 'memory') return memory(req, res, runId, tcId);
+    if (resource === 'tests') return tests(req, res, runId, tcId);
+    if (resource === 'suites') return suites(req, res, runId, tcId);
+    if (resource === 'runs' && tcId === 'heal' && req.method === 'POST') return heal(res, runId, parts[4]);
     if (resource === 'dashboard' && req.method === 'GET') {
       const memories = loadMemories({ all: true });
       return send(res, 200, {
@@ -231,7 +237,85 @@ async function saveReview(req, res, runId, tcId) {
       at: new Date().toISOString(),
     };
   writeJson(file, review);
+  // Approving the run a library script was recorded from is what makes that script trusted.
+  if (!body.verdict || body.verdict === 'approved' || body.verdict === 'rejected')
+    try {
+      reviewRecorded(loadRun(runId), tcId, body.verdict);
+    } catch {
+      // the library is optional
+    }
   return send(res, 200, review[tcId] || {});
+}
+
+const QA_RUNS = join(SKILL_DIR, 'scripts', 'qa-runs.mjs');
+
+// The library of replayable scripts: read it all, or change a test's tags or status.
+async function tests(req, res, planId, tcId) {
+  if (req.method === 'GET') return send(res, 200, listTests());
+  if (req.method !== 'PUT' || !planId || !tcId) return send(res, 405, { error: 'use GET, or PUT /api/tests/<plan>/<tc>' });
+  const body = await readBody(req);
+  try {
+    return send(res, 200, updateTest(`${planId}/${tcId}`, { tags: body.tags, status: body.status }));
+  } catch (error) {
+    return send(res, error.status || 400, { error: error.message });
+  }
+}
+
+const suiteRuns = (id) => listRuns().filter((r) => r.mode === 'replay' && r.suite === id);
+
+// Suites are the viewer's "Test plans". Running one prepares the run folder here, so the viewer can
+// open it at once, and replays it in a detached process that writes results as it goes.
+async function suites(req, res, id, action) {
+  try {
+    if (!id) {
+      if (req.method === 'GET') return send(res, 200, listSuites().map((s) => ({ ...s, runs: suiteRuns(s.id).slice(0, 5) })));
+      if (req.method === 'POST') return send(res, 201, saveSuite(await readBody(req), { create: true }));
+      return send(res, 405, { error: 'use GET or POST' });
+    }
+    const suite = readSuite(id);
+    if (!suite) return send(res, 404, { error: 'unknown test plan' });
+    if (action === 'run' && req.method === 'POST') {
+      const body = await readBody(req);
+      const { runId, warnings } = prepareSuiteRun(id, { label: body.label });
+      const log = join(runDir(runId), 'replay.log');
+      writeFileSync(log, '');
+      const child = spawn(process.execPath, [QA_RUNS, '--project', PROJECT_ROOT, 'replay', runId, ...(body.headed ? ['--headed'] : [])], {
+        cwd: PROJECT_ROOT,
+        detached: true,
+        windowsHide: true,
+        stdio: ['ignore', openSync(log, 'a'), openSync(log, 'a')],
+        env: { ...process.env, QA_PROJECT_DIR: PROJECT_ROOT },
+      });
+      child.unref();
+      return send(res, 202, { runId, warnings });
+    }
+    if (req.method === 'GET') return send(res, 200, { ...suite, runs: suiteRuns(id) });
+    if (req.method === 'PUT') return send(res, 200, saveSuite({ ...(await readBody(req)), id }));
+    if (req.method === 'DELETE') {
+      deleteSuite(id);
+      return send(res, 200, { ok: true });
+    }
+    return send(res, 405, { error: 'unsupported' });
+  } catch (error) {
+    return send(res, error.status || 400, { error: error.message });
+  }
+}
+
+// "Repair with agent": a new run of one failed replay case, ready for the orchestrator to execute.
+// Launching the Test Agent stays with Claude Code, where the password and the agent pool live.
+function heal(res, runId, tcId) {
+  if (!tcId || !existsSync(join(runDir(runId), 'plan.json'))) return send(res, 404, { error: 'unknown run or case' });
+  const out = spawnSync(process.execPath, [QA_RUNS, '--project', PROJECT_ROOT, 'heal', runId, tcId], {
+    cwd: PROJECT_ROOT,
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  const healRun = /OK run=(\S+)/.exec(out.stdout || '')?.[1];
+  if (out.status !== 0 || !healRun) return send(res, 400, { error: (out.stderr || out.stdout || 'heal failed').trim().split('\n').pop() });
+  return send(res, 201, {
+    runId: healRun,
+    prompt: `Use the run-test-plan skill to execute run ${healRun}. It is already initialized: start the execute loop with \`next ${healRun}\`, record each batch with \`usage --batch\` (that saves the repaired script), then validate.`,
+  });
 }
 
 function evidenceFor(runId, tcId) {

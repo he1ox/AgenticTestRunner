@@ -212,6 +212,34 @@
         },
         "agent": {
           "$ref": "#/$defs/agent"
+        },
+        "source": {
+          "type": "object",
+          "description": "Set by the replay runner and heal runs: the library test this case comes from, so a repaired script is saved over the original.",
+          "properties": {
+            "planId": {
+              "type": "string"
+            },
+            "tcId": {
+              "type": "string"
+            },
+            "version": {
+              "type": "integer"
+            },
+            "group": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "order": {
+              "type": "integer"
+            }
+          }
+        },
+        "environment": {
+          "type": "object",
+          "description": "Per-case override of the plan environment (targets)."
         }
       }
     },

@@ -26,23 +26,27 @@ const resultSize = (content) => {
   return { chars, images };
 };
 
+// A transcript is JSON Lines; a line cut short by a crash is skipped, not fatal.
+export function* transcriptEvents(file) {
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      yield JSON.parse(line);
+    } catch {
+      // partial line
+    }
+  }
+}
+
 // Streaming writes several usage snapshots per message; the last one for an id is final.
 // Besides tokens, the transcript shows where they went: every turn re-reads the whole context, so
 // the profile records how big the context starts and grows, and which tool results filled it.
 export function parseTranscript(file) {
-  const lines = readFileSync(file, 'utf8').split('\n');
   const finalUsage = new Map();
   const toolOf = new Map();
   const tools = {};
   let imageReads = 0;
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    let event;
-    try {
-      event = JSON.parse(line);
-    } catch {
-      continue;
-    }
+  for (const event of transcriptEvents(file)) {
     const message = event.message;
     for (const part of Array.isArray(message?.content) ? message.content : []) {
       if (part.type === 'tool_use') {
@@ -164,6 +168,11 @@ export function chatCost(runId, testCases) {
 }
 
 export function runCost(runId, testCases) {
+  // A deterministic replay runs no model: it costs nothing and has no usage to miss.
+  if (readJson(join(runDir(runId), 'meta.json'), {})?.mode === 'replay') {
+    const chat = chatCost(runId, testCases);
+    return { profile: null, models: [], totalUsd: chat.cost, agentsUsd: 0, chatUsd: chat.turns ? chat.cost : null, chatTurns: chat.turns, tokens: 0, unpriced: false, estimated: false, missingGroups: [], entries: [] };
+  }
   const entries = readJson(usageFile(runId), []);
   const chat = chatCost(runId, testCases);
   const agents = entries.reduce((sum, e) => sum + (e.costUsd || 0), 0);

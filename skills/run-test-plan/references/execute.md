@@ -14,7 +14,8 @@ to `schedule.json`. Your job is only to launch what `$Q next` prints and to repo
 3. When an agent notifies, **before anything else** record its cost; this also marks the batch
    done (the harness may clear the transcript later, so don't wait):
    `$Q usage <runId> --batch <batch> --transcript <output_file> --tokens <subagent_tokens> --tool-uses <n> --ms <duration_ms>`.
-   Never Read the transcript into this session.
+   Never Read the transcript into this session. The same call saves every passing case as a
+   replayable script in the test library (`references/library.md`); just relay its lines.
 4. Run `$Q next <runId>` again and launch what it prints. Repeat until `DONE`.
 
 `next` also **escalates**: a case a `haiku` batch finished as fail, blocked (not `needs-input`),

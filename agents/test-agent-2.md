@@ -23,13 +23,17 @@ what you saw, nothing more. Your prompt lists the briefs to run, in order, and t
   brief's CLI line. Open a "Read only if you need it" reference only for the section you need.
 
 ## Per case
+Your browser actions are saved as a script that replays this case without an agent, so: log in
+before marking your first case running (unless that case tests the login), and act only through
+the browser tools (never change the page with `browser_evaluate`).
 1. `$Q mark <run> <tc> running`.
 2. Do the steps in order. Record what you actually see for each one.
 3. Evidence goes in the brief's evidence folder, named `NN-<step-slug>.<ext>`:
    - Proof of each expected result, and every fail/blocked: an annotated screenshot. Read the
      brief's capture snippet once, set `file` and `marks` (CSS or `text=…` selectors; types
      rect, ellipse, highlight, arrow, text, step, spotlight, blur; one arrow or box per point you
-     prove), and run it with `browser_run_code_unsafe` as `code`.
+     prove; a replay fails when a marked element is missing, so mark the text that proves it),
+     and run it with `browser_run_code_unsafe` as `code`.
    - Anything else: `browser_take_screenshot` with `scale: "css"` and `filename`.
    - Save request/response bodies you rely on as `.json`.
    - Blur personal data only when the brief says so.

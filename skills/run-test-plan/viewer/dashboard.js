@@ -16,6 +16,13 @@ const RANGES = [
   { key: 'all', label: 'All time', days: null },
 ];
 const DAY = 24 * 60 * 60 * 1000;
+// Agent runs and deterministic replays answer different questions (how good are the agents vs.
+// does the product still work), so the dashboard can show either alone.
+const SOURCES = [
+  ['all', 'All runs'],
+  ['agent', 'Agents'],
+  ['replay', 'Deterministic'],
+];
 const MAX_RUN_COLUMNS = 15;
 
 const el = (tag, attrs = {}, ...children) => {
@@ -79,7 +86,7 @@ function barPath(x, y, w, h, roundEnd) {
 }
 
 export function createDashboard({ host, api, icon, onOpenRun, onOpenCase }) {
-  const state = { data: null, range: '30', plan: 'all', variantKey: null, showAllRuns: false };
+  const state = { data: null, range: '30', plan: 'all', source: 'all', variantKey: null, showAllRuns: false };
   const tip = el('div', { class: 'dash-tip', role: 'tooltip', hidden: true });
   document.body.append(tip);
 
@@ -137,6 +144,7 @@ export function createDashboard({ host, api, icon, onOpenRun, onOpenCase }) {
     const now = Date.now();
     return state.data.runs.filter((run) => {
       if (state.plan !== 'all' && run.planId !== state.plan) return false;
+      if (state.source !== 'all' && (run.mode || 'agent') !== state.source) return false;
       if (!range.days) return offsetPeriods === 0;
       const age = now - Date.parse(run.createdAt);
       return age >= range.days * DAY * offsetPeriods && age < range.days * DAY * (offsetPeriods + 1);
@@ -703,6 +711,13 @@ export function createDashboard({ host, api, icon, onOpenRun, onOpenCase }) {
         ),
       ),
       el(
+        'div',
+        { class: 'segmented', role: 'group', 'aria-label': 'Executed by' },
+        SOURCES.map(([key, label]) =>
+          el('button', { type: 'button', 'aria-pressed': String(state.source === key), onclick: () => ((state.source = key), render()), text: label }),
+        ),
+      ),
+      el(
         'label',
         { class: 'dash-inline-select' },
         el('span', { text: 'Plan' }),
@@ -780,7 +795,7 @@ export function createDashboard({ host, api, icon, onOpenRun, onOpenCase }) {
     );
     const grid = el('div', { class: 'dash-grid' }, outcomesByRun(runs), timeByRun(runs), costByRun(runs), contextByTool(runs, now.cases), outcomesByVariant(now.cases), attentionTable(now.cases), slowestTable(now.cases));
     host.replaceChildren(
-      el('div', { class: 'dash-head' }, el('div', {}, el('h1', { text: 'Test agents' }), el('p', { class: 'dash-muted', text: `${runs.length} run${runs.length === 1 ? '' : 's'} · ${now.cases.length} cases · ${rangeLabel}` })), filters()),
+      el('div', { class: 'dash-head' }, el('div', {}, el('h1', { text: state.source === 'replay' ? 'Deterministic runs' : 'Test agents' }), el('p', { class: 'dash-muted', text: `${runs.length} run${runs.length === 1 ? '' : 's'} · ${now.cases.length} cases · ${rangeLabel}` })), filters()),
       runs.length ? kpis : null,
       runs.length ? grid : el('p', { class: 'dash-empty', text: 'No runs in this range. Widen the range or start a run with qa-runs.mjs init.' }),
       recentRuns(runs),

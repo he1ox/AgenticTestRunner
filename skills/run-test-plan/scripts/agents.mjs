@@ -4,8 +4,31 @@
 // Without the plugin's agents, `next --fallback` sends the same rules as a general-purpose agent's
 // prompt.
 
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 export const POOL_SIZE = 3;
 export const PLAYWRIGHT_MCP = '@playwright/mcp@0.0.82';
+
+// npx arguments for one browser: its own in-memory profile (--isolated), so parallel agents never
+// share tabs or cookies. Screenshots are evidence for the human; the agent reads the page from
+// snapshots, so sending the image back would only add tokens to every later turn.
+//   QA_PLAYWRIGHT_MCP   package to run instead of the pinned one, e.g. @playwright/mcp@latest
+//   QA_BROWSER_ARGS     extra flags for every slot, e.g. "--headless --viewport-size 1440x900"
+export function browserArgs(slot, { headless = false } = {}) {
+  const extra = (process.env.QA_BROWSER_ARGS || '').split(/\s+/).filter(Boolean);
+  return [
+    '-y',
+    process.env.QA_PLAYWRIGHT_MCP || PLAYWRIGHT_MCP,
+    '--isolated',
+    '--image-responses',
+    'omit',
+    '--output-dir',
+    join(tmpdir(), `qa-browser-${slot}`),
+    ...(headless && !extra.includes('--headless') ? ['--headless'] : []),
+    ...extra,
+  ];
+}
 
 // Loaded up front: what nearly every case needs. The rest is loaded only when a brief asks.
 const CORE_TOOLS = [
@@ -55,13 +78,17 @@ what you saw, nothing more. Your prompt lists the briefs to run, in order, and t
   brief's CLI line. Open a "Read only if you need it" reference only for the section you need.
 
 ## Per case
+Your browser actions are saved as a script that replays this case without an agent, so: log in
+before marking your first case running (unless that case tests the login), and act only through
+the browser tools (never change the page with \`browser_evaluate\`).
 1. \`$Q mark <run> <tc> running\`.
 2. Do the steps in order. Record what you actually see for each one.
 3. Evidence goes in the brief's evidence folder, named \`NN-<step-slug>.<ext>\`:
    - Proof of each expected result, and every fail/blocked: an annotated screenshot. Read the
      brief's capture snippet once, set \`file\` and \`marks\` (CSS or \`text=…\` selectors; types
      rect, ellipse, highlight, arrow, text, step, spotlight, blur; one arrow or box per point you
-     prove), and run it with \`browser_run_code_unsafe\` as \`code\`.
+     prove; a replay fails when a marked element is missing, so mark the text that proves it),
+     and run it with \`browser_run_code_unsafe\` as \`code\`.
    - Anything else: \`browser_take_screenshot\` with \`scale: "css"\` and \`filename\`.
    - Save request/response bodies you rely on as \`.json\`.
    - Blur personal data only when the brief says so.

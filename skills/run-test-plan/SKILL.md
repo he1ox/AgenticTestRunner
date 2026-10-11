@@ -1,6 +1,6 @@
 ---
 name: run-test-plan
-description: Use when asked to execute QA test cases or a test plan (an issue-tracker test ticket, "run the test cases", "corre los test cases", "ejecuta el plan", retest a ticket) against a web app with browser agents, with a local viewer showing each case's result, evidence, and optional recording. Also use to reopen the viewer or retest the cases a reviewer rejected.
+description: Use when asked to execute QA test cases or a test plan (an issue-tracker test ticket, "run the test cases", "corre los test cases", "ejecuta el plan", retest a ticket) against a web app with browser agents, with a local viewer showing each case's result, evidence, and optional recording. Also use to reopen the viewer, retest the cases a reviewer rejected, run a saved Test plan (suite) deterministically, or repair a library script whose replay failed.
 ---
 
 # Run Test Plan
@@ -44,7 +44,8 @@ medium effort runs it as well as a larger model. Spend effort on drafting the pl
 
 Only when needed: `references/memory.md` (what agents remember, live questions, secrets),
 `references/recording.md` (video), `references/annotate.md` (screenshot marks),
-`references/chat.md` (the viewer's agent chat).
+`references/chat.md` (the viewer's agent chat), `references/library.md` (passing cases saved as
+replayable scripts, Test plans, deterministic runs with `$Q suite run`, repairs with `$Q heal`).
 
 ## Guardrails
 

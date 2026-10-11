@@ -27,6 +27,17 @@
 //                             Record what a batch cost and mark it done; no source = summary
 //                             (--profile: where the run's tokens went, by tool).
 //   profile <transcript.jsonl…>  Where agents' tokens went, by tool, from transcripts.
+//
+// Test library and deterministic runs (references/library.md):
+//   tests [list [--tag t] | show <id> | tag <id> <a,b> | verify <id> | draft <id>]
+//                             Scripts saved from passing cases, by id PLAN/TC.
+//   suite list | show <id> | create <name> [--tags a,b] [--tests ids] [--tag t]
+//         | add|remove <id> <testIds…> [--tag t] | delete <id>
+//                             Test plans (suites): a name, tags and library tests.
+//   suite run <id> [--headed] [--label txt]
+//                             Replay every test of a suite without an agent (no tokens).
+//   replay <runId>            Execute a run the viewer prepared (spawned by the server).
+//   heal <runId> <tcId>       New agent run of one failed replay case; its script replaces the old.
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -50,7 +61,21 @@ import {
 import { answerQuestion, askQuestion, openQuestions, readQuestions, waitForAnswer } from './questions.mjs';
 import { PRICING_AS_OF, costOf } from './pricing.mjs';
 import { buildSchedule, escalate, execution, finishBatch, nextLaunch, readSchedule, saveSchedule } from './schedule.mjs';
+import { executeRun, prepareSuiteRun } from './replay.mjs';
 import { mergeProfiles, parseTranscript, recordUsage, runCost } from './usage.mjs';
+import {
+  captureCode,
+  cleanTags,
+  deleteSuite,
+  extractScripts,
+  listSuites,
+  listTests,
+  readSuite,
+  readTest,
+  recordingCode,
+  saveSuite,
+  updateTest,
+} from './tests.mjs';
 import {
   CONFIG,
   PORT,
@@ -58,6 +83,7 @@ import {
   SKILL_DIR,
   countStatuses,
   displayPath,
+  ensureServer,
   listRuns,
   loadRun,
   readJson,
@@ -86,8 +112,8 @@ const fail = (message) => {
   process.exit(1);
 };
 
-async function init() {
-  const planFile = args[0] && resolve(args[0]);
+async function init(planArg = args[0], opts = flags) {
+  const planFile = planArg && resolve(planArg);
   if (!planFile || !existsSync(planFile)) fail('init needs an existing plan file.');
   const plan = readJson(planFile);
   if (!plan || plan.__parseError) fail(`plan is not valid JSON: ${plan?.__parseError}`);
@@ -95,13 +121,13 @@ async function init() {
   if (problems.length) fail(`plan has problems:\n- ${problems.join('\n- ')}`);
 
   let selected = plan.testCases;
-  if (flags.only) {
-    const only = new Set(String(flags.only).split(','));
+  if (opts.only) {
+    const only = new Set(String(opts.only).split(','));
     selected = selected.filter((tc) => only.has(tc.id));
   }
   const carried = new Map();
-  if (flags.retest) {
-    const previous = loadRun(flags.retest);
+  if (opts.retest) {
+    const previous = loadRun(opts.retest);
     for (const tc of previous.testCases) {
       const answered = (tc.questions || []).filter((q) => q.answeredAt);
       if (answered.length) carried.set(tc.id, answered);
@@ -127,10 +153,11 @@ async function init() {
   writeJson(join(dir, 'plan.json'), frozen);
   writeJson(join(dir, 'meta.json'), {
     createdAt: new Date().toISOString(),
-    label: flags.label || null,
+    label: opts.label || null,
     planFile: repoPath(planFile),
-    recordAll: Boolean(flags.record),
-    retestOf: flags.retest || null,
+    recordAll: Boolean(opts.record),
+    retestOf: opts.retest || null,
+    ...(opts.heal && { healOf: opts.heal }),
   });
   writeJson(join(dir, 'review.json'), {});
 
@@ -138,7 +165,7 @@ async function init() {
   for (const tc of selected) {
     const base = tcDir(runId, tc.id);
     mkdirSync(join(base, 'evidence'), { recursive: true });
-    const record = Boolean(flags.record || tc.record || plan.defaults?.record);
+    const record = Boolean(opts.record || tc.record || plan.defaults?.record);
     if (record) writeRecordingSnippets(runId, tc.id);
     writeCaptureSnippet(runId, tc.id);
     const memories = rank(
@@ -172,6 +199,7 @@ async function init() {
   if (briefed.length) console.log(`memory: ${new Set(briefed.map((e) => e.id)).size} pointer(s) in briefs`);
   for (const ref of secrets)
     console.log(`secret needed: ${ref} (${process.env[ref.slice(4)] ? 'set' : 'NOT set'}); pass it in the agent prompt`);
+  return runId;
 }
 
 function checkPlan(plan) {
@@ -339,55 +367,8 @@ function brief(plan, tc, runId, record, { memories = [], carried = [] } = {}) {
   return lines.join('\n');
 }
 
-// Captures a screenshot and its annotations in one Playwright call: element boxes come from the
-// live DOM (text nodes are measured tightly so an arrow lands on the words, not the full-width
-// block), then the marks are PUT to the viewer server, which writes the sidecar next to the image.
 function writeCaptureSnippet(runId, tcId) {
-  const base = tcDir(runId, tcId);
-  const endpoint = `http://127.0.0.1:${PORT}/api/runs/${encodeURIComponent(runId)}/annotations/${encodeURIComponent(tcId)}/`;
-  writeFileSync(
-    join(base, '.capture.js'),
-    `async (page) => {
-  const file = '01-step-slug.png';
-  const marks = [
-    { selector: 'input[name="email"]', type: 'rect', label: 'Email left empty' },
-    { selector: 'text=Email is required', type: 'arrow', label: 'Inline required error' },
-  ];
-
-  const evidence = ${JSON.stringify(repoPath(join(base, 'evidence')))};
-  const endpoint = ${JSON.stringify(endpoint)};
-  const items = [];
-  const elements = {};
-  for (const mark of marks) {
-    const handle = await page.locator(mark.selector).first().elementHandle({ timeout: 3000 }).catch(() => null);
-    const box =
-      handle &&
-      (await handle.evaluate((node) => {
-        const range = document.createRange();
-        range.selectNodeContents(node);
-        const text = range.getBoundingClientRect();
-        const element = node.getBoundingClientRect();
-        const r = text.width > 0 && text.width < element.width - 4 ? text : element;
-        return { x: r.x, y: r.y, width: r.width, height: r.height };
-      }));
-    if (!box) {
-      items.push({ type: 'text', x: 12, y: 12, text: 'Not found: ' + mark.selector, color: 'yellow' });
-      continue;
-    }
-    elements[mark.name || mark.label || mark.selector] = box;
-    if (mark.type) items.push({ type: mark.type, box, label: mark.label, text: mark.text, color: mark.color, n: mark.n });
-  }
-  await page.screenshot({ path: evidence + '/' + file, scale: 'css' });
-  const response = await page.request
-    .put(endpoint + encodeURIComponent(file), {
-      headers: { 'x-qa-viewer': '1' },
-      data: { author: 'agent', mode: 'replace', items, elements, summary: 'captured by the Test Agent' },
-    })
-    .catch((error) => ({ status: () => 0, text: async () => String(error) }));
-  return file + ' saved; annotations: ' + response.status() + ' ' + (await response.text());
-}
-`,
-  );
+  writeFileSync(join(tcDir(runId, tcId), '.capture.js'), captureCode(runId, tcId));
 }
 
 // A function, not a const: commands run via top-level await before later consts initialize.
@@ -474,72 +455,15 @@ function cell(text) {
   return String(text).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
 }
 
-// Recording runs inside the Playwright MCP process, which has no file system access, so frames
-// stream over HTTP to the viewer server, which stitches them with ffmpeg on stop.
 function writeRecordingSnippets(runId, tcId) {
   const dir = join(tcDir(runId, tcId), '.rec');
   mkdirSync(dir, { recursive: true });
-  const endpoint = `http://127.0.0.1:${PORT}/api/rec/${encodeURIComponent(runId)}/${encodeURIComponent(tcId)}`;
-  writeFileSync(
-    join(dir, 'start.js'),
-    `async (page) => {
-  const endpoint = ${JSON.stringify(endpoint)};
-  if (page.__qaRec) return 'already recording';
-  const health = await page.request.get(endpoint.replace(/\\/api\\/rec\\/.*/, '/api/health')).catch(() => null);
-  if (!health || !health.ok()) return 'viewer server is not running: run qa-runs.mjs open first';
-  await page.request.post(endpoint + '/start');
-  const session = await page.context().newCDPSession(page);
-  let n = 0;
-  session.on('Page.screencastFrame', (frame) => {
-    session.send('Page.screencastFrameAck', { sessionId: frame.sessionId }).catch(() => {});
-    page.request.post(endpoint + '/frame', { data: { n: ++n, ts: frame.metadata.timestamp, data: frame.data } }).catch(() => {});
-  });
-  await session.send('Page.startScreencast', { format: 'jpeg', quality: 70, maxWidth: 1600, maxHeight: 1000 });
-  page.__qaRec = session;
-  return 'recording';
-}
-`,
-  );
-  writeFileSync(
-    join(dir, 'stop.js'),
-    `async (page) => {
-  const endpoint = ${JSON.stringify(endpoint)};
-  const session = page.__qaRec;
-  if (!session) return 'not recording';
-  await page.waitForTimeout(1200);
-  await session.send('Page.stopScreencast').catch(() => {});
-  await session.detach().catch(() => {});
-  delete page.__qaRec;
-  await page.waitForTimeout(800);
-  const response = await page.request.post(endpoint + '/stop', { timeout: 180000 });
-  return await response.text();
-}
-`,
-  );
-}
-
-async function health() {
-  try {
-    const response = await fetch(`http://127.0.0.1:${PORT}/api/health`, { signal: AbortSignal.timeout(1500) });
-    return response.ok;
-  } catch {
-    return false;
-  }
+  writeFileSync(join(dir, 'start.js'), recordingCode(runId, tcId, 'start'));
+  writeFileSync(join(dir, 'stop.js'), recordingCode(runId, tcId, 'stop'));
 }
 
 async function open() {
-  if (!(await health())) {
-    const child = spawn(process.execPath, [join(SKILL_DIR, 'scripts', 'server.mjs')], {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-      cwd: PROJECT_ROOT,
-      env: { ...process.env, QA_PROJECT_DIR: PROJECT_ROOT },
-    });
-    child.unref();
-    for (let i = 0; i < 40 && !(await health()); i += 1) await new Promise((r) => setTimeout(r, 250));
-    if (!(await health())) fail(`viewer server did not start on port ${PORT}.`);
-  }
+  if (!(await ensureServer())) fail(`viewer server did not start on port ${PORT}.`);
   const runId = args[0];
   const url = `http://127.0.0.1:${PORT}/${runId ? `#/run/${encodeURIComponent(runId)}` : ''}`;
   if (!flags['no-browser']) {
@@ -748,6 +672,14 @@ function usage() {
         console.log(
           `OK ${group || 'run'} ${e.model} ${(e.totalTokens ?? e.reportedTokens).toLocaleString('en-US')} tokens${e.totalTokens ? '' : ' (reported)'} ${usd(e.costUsd)}${e.estimated ? ` (estimated: ${e.rateSource || 'unknown price'})` : ''} [${e.source}]${e.profile ? `  ${profileLine(e.profile)}` : ''}`,
         );
+      // The same transcript holds the Playwright code the agent ran: passing cases become
+      // replayable scripts in the test library.
+      if (flags.transcript && existsSync(resolve(String(flags.transcript))))
+        try {
+          for (const line of extractScripts(loadRun(runId), cases, resolve(String(flags.transcript)), batch)) console.log(line);
+        } catch (error) {
+          console.log(`! scripts not saved: ${error.message}`);
+        }
       if (batch) finishBatch(runId, batch.id, 'done');
     } catch (error) {
       fail(error.message);
@@ -911,8 +843,124 @@ function latest() {
   console.log(run.id);
 }
 
+function testLine(t) {
+  const last = t.lastReplay ? `  last replay ${t.lastReplay.status} ${t.lastReplay.at.slice(0, 10)}` : '';
+  return `${t.id.padEnd(22)} ${t.status.padEnd(8)} v${t.version}  ${String(t.steps.length).padStart(2)} steps  [${(t.tags || []).join(', ')}]${last}  ${t.title}`;
+}
+
+// The test library: one replayable script per case an agent passed (see references/library.md).
+function tests() {
+  const [action = 'list', id, ...rest] = args;
+  try {
+    if (action === 'list') {
+      const list = listTests().filter((t) => !flags.tag || (t.tags || []).includes(String(flags.tag).toLowerCase()));
+      if (!list.length) return console.log('no tests in the library yet: they are saved when an agent passes a case.');
+      for (const t of list) console.log(testLine(t));
+    } else if (action === 'show') {
+      const test = readTest(id);
+      if (!test) fail(`unknown test ${id}`);
+      console.log(JSON.stringify(test, null, 2));
+    } else if (action === 'tag') {
+      console.log(`OK ${id} tags: ${updateTest(id, { tags: rest.join(',') }).tags.join(', ') || '(none)'}`);
+    } else if (action === 'verify' || action === 'draft') {
+      console.log(`OK ${id} ${updateTest(id, { status: action === 'verify' ? 'verified' : 'draft' }).status}`);
+    } else fail('usage: tests [list [--tag t] | show <id> | tag <id> <a,b> | verify <id> | draft <id>]');
+  } catch (error) {
+    fail(error.message);
+  }
+}
+
+const testsByTag = (tag) =>
+  listTests()
+    .filter((t) => (t.tags || []).includes(String(tag).toLowerCase()))
+    .map((t) => t.id);
+
+// Suites are the viewer's "Test plans": a name, free tags and a list of library tests.
+async function suite() {
+  const [action = 'list', id, ...rest] = args;
+  try {
+    if (action === 'list') {
+      const suites = listSuites();
+      if (!suites.length) return console.log('no test plans yet: create one with `suite create "<name>"` or in the viewer.');
+      for (const s of suites) console.log(`${s.id.padEnd(24)} ${String(s.tests.length).padStart(3)} tests  [${s.tags.join(', ')}]  ${s.name}`);
+    } else if (action === 'show') {
+      const s = readSuite(id);
+      if (!s) fail(`unknown test plan ${id}`);
+      console.log(`${s.name}  (${s.id})  tags: ${s.tags.join(', ') || '-'}`);
+      for (const testId of s.tests) {
+        const t = readTest(testId);
+        console.log(t ? `  ${testLine(t)}` : `  ${testId}  (missing from the library)`);
+      }
+    } else if (action === 'create') {
+      const name = [id, ...rest].filter(Boolean).join(' ');
+      const ids = [...(flags.tests ? String(flags.tests).split(',') : []), ...(flags.tag ? testsByTag(flags.tag) : [])];
+      for (const testId of ids) if (!readTest(testId)) fail(`unknown test ${testId}`);
+      const s = saveSuite({ name, tags: flags.tags === true ? [] : cleanTags(flags.tags || ''), tests: ids }, { create: true });
+      console.log(`OK ${s.id} "${s.name}" ${s.tests.length} test(s)`);
+    } else if (action === 'add' || action === 'remove') {
+      const s = readSuite(id);
+      if (!s) fail(`unknown test plan ${id}`);
+      const ids = [...rest, ...(flags.tag ? testsByTag(flags.tag) : [])];
+      for (const testId of ids) if (action === 'add' && !readTest(testId)) fail(`unknown test ${testId}`);
+      const tests = action === 'add' ? [...s.tests, ...ids] : s.tests.filter((t) => !ids.includes(t));
+      console.log(`OK ${id} ${saveSuite({ ...s, tests }).tests.length} test(s)`);
+    } else if (action === 'delete') {
+      deleteSuite(id);
+      console.log(`OK ${id} deleted`);
+    } else if (action === 'run') {
+      if (!(await ensureServer())) fail(`viewer server did not start on port ${PORT}; captures and recordings need it.`);
+      const { runId, warnings } = prepareSuiteRun(id, { label: flags.label });
+      console.log(`OK run=${runId}`);
+      console.log(`viewer=http://127.0.0.1:${PORT}/#/run/${encodeURIComponent(runId)}`);
+      for (const w of warnings) console.log(`! ${w}`);
+      await executeRun(runId, { headed: Boolean(flags.headed), log: (line) => console.log(line) });
+      const run = loadRun(runId);
+      printStatus(run, countStatuses(run), true);
+    } else
+      fail(
+        'usage: suite [list | show <id> | create <name> [--tags a,b] [--tests ids] [--tag t] | add|remove <id> <testIds…> [--tag t] | delete <id> | run <id> [--headed] [--label txt]]',
+      );
+  } catch (error) {
+    fail(error.message);
+  }
+}
+
+// Runs a run folder prepared by the viewer's "Run" button (the server spawns this detached).
+async function replay() {
+  const runId = args[0];
+  if (!runId || !existsSync(runDir(runId))) fail('usage: replay <runId>');
+  await ensureServer();
+  await executeRun(runId, { headed: Boolean(flags.headed), log: (line) => console.log(line) });
+}
+
+// A replay that failed because the UI changed on purpose is repaired by a Test Agent: a new run of
+// just that case, briefed from the original steps. When the agent passes it, `usage --batch`
+// saves its script as the next version of the same library test.
+async function heal() {
+  const [runId, tcId] = args;
+  if (!runId || !tcId || !existsSync(runDir(runId))) fail('usage: heal <runId> <tcId>');
+  const run = loadRun(runId);
+  const tc = run.testCases.find((t) => t.id === tcId);
+  if (!tc) fail(`unknown test case ${tcId} in ${runId}`);
+  const name = tc.source ? `${tc.source.planId}/${tc.source.tcId}` : tcId;
+  // The agent is told why it is here: the brief's notes carry the replay failure.
+  const why = tc.result?.notes?.split('\n')[0] || tc.result?.summary || 'the recorded script no longer replays';
+  const plan = {
+    ...run.plan,
+    testCases: run.plan.testCases.map((t) =>
+      t.id === tcId
+        ? { ...t, notes: [t.notes, `Repairing a recorded script. ${why} The UI may have changed on purpose: follow the steps as the app works now, and pass only if the expected result holds.`].filter(Boolean).join('\n') }
+        : t,
+    ),
+  };
+  const planFile = join(runDir(runId), `heal-${tcId}.plan.json`);
+  writeJson(planFile, plan);
+  const healId = await init(planFile, { only: tcId, label: `Repair ${name}`, heal: runId, record: tc.record });
+  console.log(`NEXT in Claude Code: "run-test-plan: execute run ${healId}, already initialized (references/execute.md, from \`next\`)"`);
+}
+
 // Dispatch last, so every function and constant above is initialized before a command runs.
-const commands = { init, open, serve, mark, next, validate, status, latest, annotate, ask, answer, questions, memory, usage, profile };
+const commands = { init: () => init(), open, serve, mark, next, validate, status, latest, annotate, ask, answer, questions, memory, usage, profile, tests, suite, replay, heal };
 if (!commands[command]) {
   console.log(
     readFileSync(new URL(import.meta.url), 'utf8')
