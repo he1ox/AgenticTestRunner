@@ -9,11 +9,12 @@ import { join } from 'node:path';
 import { browserArgs } from './agents.mjs';
 import { McpClient, sections } from './mcp-client.mjs';
 import { execution } from './schedule.mjs';
-import { captureCode, fillSecrets, needsSecret, readSuite, readTest, recordingCode, updateTest } from './tests.mjs';
+import { captureCode, fillPaths, fillSecrets, needsSecret, readSuite, readTest, recordingCode, updateTest } from './tests.mjs';
 import { CONFIG, PROJECT_ROOT, readJson, runDir, stamp, tcDir, writeJson } from './lib.mjs';
 
 const ANSI = /\x1b\[[0-9;]*m/g;
 const actionTimeout = () => Math.max(1000, Number(CONFIG.execution?.replayTimeoutMs) || 15000);
+const navigationTimeout = () => Math.max(5000, Number(CONFIG.execution?.replayNavigationTimeoutMs) || 60000);
 // Tools after which the page may navigate: give it a moment to load before the next action, since
 // a replay runs far faster than the agent that recorded it.
 const SETTLE = new Set(['click', 'navigate', 'navigate_back', 'press_key', 'select_option', 'type', 'fill_form']);
@@ -117,8 +118,10 @@ async function runAction(client, runId, tcId, action, creds) {
       ? "\n  await page.waitForLoadState('load', { timeout: 10000 }).catch(() => {});"
       : '';
     // A missing element should fail the step in seconds, not after Playwright's 30 s default.
-    code = `async (page) => {\n  page.setDefaultTimeout(${actionTimeout()});\n${fillSecrets(action.code, creds)}${settle}\n}`;
-  } else if (action.kind === 'capture')
+    // Pages with slow third-party resources reach "load" late, so navigation gets its own, longer wait.
+    code = `async (page) => {\n  page.setDefaultTimeout(${actionTimeout()});\n  page.setDefaultNavigationTimeout(${navigationTimeout()});\n${fillSecrets(action.code, creds)}${settle}\n}`;
+  } else if (action.kind === 'capture' && action.code) code = fillSecrets(fillPaths(action.code, runId, tcId), creds);
+  else if (action.kind === 'capture')
     code = captureCode(runId, tcId, {
       file: action.file,
       marks: fillSecrets(action.marks || '[]', creds),
@@ -129,6 +132,7 @@ async function runAction(client, runId, tcId, action, creds) {
   else return { error: `unknown action kind "${action.kind}"` };
   try {
     const reply = await client.call('browser_run_code_unsafe', { code }, 200000);
+    if (process.env.QA_REPLAY_DEBUG) console.error('ACTION', action.kind, action.file || '', `\n${code.slice(0, 300)}\n=> ${reply.text.slice(0, 300)}`);
     if (reply.isError) return { error: errorOf(reply.text) };
     const output = (sections(reply.text).get('Result') || '').replace(/^"|"$/g, '');
     if (action.kind === 'capture' && output.startsWith('MISSING ')) {

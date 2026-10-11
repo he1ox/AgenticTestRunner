@@ -52,7 +52,8 @@ $Q tests [--tag smoke]   $Q tests tag <PLAN/TC> a,b   $Q tests verify <PLAN/TC>
 Passwords come from the account's `secret` (`env:NAME` in `.qa/config.json → execution.accounts`)
 or `QA_PASSWORD`; without one, a test that types a password ends `blocked` and says which variable to set. The
 viewer server passes on its own environment, so start it (`$Q open`) from a shell that has them.
-`execution.replayTimeoutMs` (default 15000) is how long an action waits for its element.
+`execution.replayTimeoutMs` (default 15000) is how long an action waits for its element and
+`execution.replayNavigationTimeoutMs` (default 60000) how long a page may take to load.
 
 Groups run one at a time unless `execution.sessions` is `shared`. A test recorded right after
 another case of the same agent session, with no separate login, may depend on it: the run warns

@@ -274,6 +274,12 @@
           "minimum": 1000,
           "default": 15000,
           "description": "How long a deterministic replay waits for an element before the step fails."
+        },
+        "replayNavigationTimeoutMs": {
+          "type": "integer",
+          "minimum": 5000,
+          "default": 60000,
+          "description": "How long a deterministic replay waits for a page to load."
         }
       }
     }

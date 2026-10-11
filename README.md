@@ -161,6 +161,7 @@ node skills/run-test-plan/scripts/qa-runs.mjs memory --help
 | `QA_CLAUDE_BIN` | `claude` | Claude Code binary the chat runs |
 | `QA_USER_MEMORY_DIR` | `~/.claude/qa-memory` | Personal memory folder |
 | `QA_PASSWORD` | none | Password deterministic replays type when the account has no `secret` |
+| `QA_REPLAY_DEBUG` | off | Print every action a deterministic replay sends and the browser's reply |
 
 ### Test plans: deterministic runs
 

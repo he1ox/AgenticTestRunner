@@ -190,6 +190,20 @@ function parseCapture(source) {
   return { kind: 'capture', file: basename(file), marks: source.slice(open, close + 1) };
 }
 
+const EVIDENCE_LITERAL = /(['"`])[^'"`\n]*?[\\/]tc[\\/][A-Za-z0-9._-]+[\\/]evidence\1/g;
+const ANNOTATIONS_LITERAL = /(['"`])https?:\/\/(?:127\.0\.0\.1|localhost):\d+\/api\/runs\/[^'"`\n]+?\/annotations\/[^'"`\n]+?\/\1/g;
+
+export const templatePaths = (source) =>
+  source.replace(EVIDENCE_LITERAL, '"{{evidence}}"').replace(ANNOTATIONS_LITERAL, '"{{annotations}}"');
+
+// Points a templated capture at a new run's evidence folder and annotation endpoint.
+export const fillPaths = (source, runId, tcId) =>
+  source
+    .split('"{{evidence}}"')
+    .join(JSON.stringify(join(tcDir(runId, tcId), 'evidence').split('\\').join('/')))
+    .split('"{{annotations}}"')
+    .join(JSON.stringify(annotationsEndpoint(runId, tcId)));
+
 function snippetSource(filename) {
   if (!filename) return '';
   for (const path of [resolve(filename), resolve(PROJECT_ROOT, filename)])
@@ -203,7 +217,15 @@ function toAction(tool, call) {
     const source = call.input.filename ? snippetSource(call.input.filename) : String(call.input.code || '');
     if (source.includes('Page.startScreencast')) return { kind: 'rec', action: 'start' };
     if (source.includes('Page.stopScreencast')) return { kind: 'rec', action: 'stop' };
-    if (source.includes('/annotations/') && /const marks\s*=/.test(source)) return parseCapture(source);
+    if (source.includes('/annotations/') && /const marks\s*=/.test(source)) {
+      const capture = parseCapture(source);
+      if (capture) return capture;
+    }
+    // An agent may write its own capture code instead of filling the snippet: keep it whole,
+    // with this run's paths as placeholders the replay fills in.
+    const file = /const file\s*=\s*(['"`])((?:\\.|(?!\1).)*)\1/.exec(source)?.[2];
+    if (file && /page\.screenshot\(/.test(source) && /[\\/]evidence['"`]/.test(source))
+      return { kind: 'capture', file: basename(file), code: templatePaths(source) };
   }
   if (tool === 'browser_take_screenshot' && call.input.filename)
     return { kind: 'capture', file: basename(String(call.input.filename)), marks: '[]' };
@@ -211,27 +233,51 @@ function toAction(tool, call) {
   return code ? { kind: 'code', tool: tool.replace(/^browser_/, ''), code } : null;
 }
 
+// The case whose result.json a Write or Edit call writes, if it belongs to this run.
+function resultWritten(call, runId) {
+  if (call.name !== 'Write' && call.name !== 'Edit') return null;
+  const path = String(call.input.file_path || '').split('\\').join('/');
+  const match = /\/tc\/([A-Za-z0-9._-]+)\/result\.json$/.exec(path);
+  return match && path.includes(`/${runId}/`) ? match[1] : null;
+}
+
 // What the agent did, split into the setup before its first case (the login) and one list of
 // actions per case. Failed tool calls are dropped: a replay repeats what worked, not the retries.
+// Cases are delimited by `mark <run> <tc> running`; agents sometimes skip that, so writing a
+// case's result.json also closes it: whatever was done since the previous case belongs to it.
 export function extractActions(transcript, runId) {
   const { prompt, calls } = toolCalls(transcript);
   const setup = [];
   const cases = new Map();
   let current = null;
+  let loose = [];
+  const take = (tc) => {
+    if (!cases.has(tc)) cases.set(tc, []);
+    cases.get(tc).push(...loose.splice(0));
+    return cases.get(tc);
+  };
   for (const call of calls) {
     if (call.name === 'Bash') {
       const mark = MARK_RUNNING.exec(String(call.input.command || ''));
-      if (mark && mark[1] === runId) {
+      if (mark && mark[1] === runId && mark[2] !== current) {
+        if (!cases.size) setup.push(...loose.splice(0));
         current = mark[2];
-        if (!cases.has(current)) cases.set(current, []);
+        take(current);
       }
+      continue;
+    }
+    const written = call.done && !call.isError ? resultWritten(call, runId) : null;
+    if (written) {
+      if (current === written || (!current && loose.length)) take(written);
+      if (current === written) current = null;
       continue;
     }
     const tool = BROWSER_TOOL.exec(call.name)?.[1];
     if (!tool || !call.done || call.isError) continue;
     const action = toAction(tool, call);
-    if (action) (current ? cases.get(current) : setup).push(action);
+    if (action) (current ? cases.get(current) : loose).push(action);
   }
+  if (!cases.size) setup.push(...loose.splice(0));
   return { login: parseLogin(prompt), setup, cases };
 }
 
@@ -256,7 +302,9 @@ const redactAction = (action, login) =>
   action.kind === 'code'
     ? { ...action, code: redact(action.code, login) }
     : action.kind === 'capture'
-      ? { ...action, marks: redact(action.marks, login) }
+      ? action.code
+        ? { ...action, code: redact(action.code, login) }
+        : { ...action, marks: redact(action.marks, login) }
       : action;
 
 export const jsEscape = (value) => String(value).replace(/[\\'"`]/g, '\\$&').replace(/\r?\n/g, '\\n').replace(/\$\{/g, '\\${');
