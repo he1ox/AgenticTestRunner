@@ -24,10 +24,13 @@ const stale = existsSync(join(root, 'agents'))
       .filter((f) => !(f in files))
   : [];
 
+// Line endings are ignored: a Windows checkout with core.autocrlf has CRLF files that git stores as LF.
+const read = (file) => readFileSync(join(root, file), 'utf8').replace(/\r\n/g, '\n');
+
 if (process.argv.includes('--check')) {
   const outdated = [
     ...Object.entries(files)
-      .filter(([file, content]) => !existsSync(join(root, file)) || readFileSync(join(root, file), 'utf8') !== content)
+      .filter(([file, content]) => !existsSync(join(root, file)) || read(file) !== content)
       .map(([file]) => file),
     ...stale,
   ];
