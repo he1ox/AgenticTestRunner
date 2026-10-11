@@ -11,6 +11,23 @@
   free-form `variants`, `referenceCheck` and `issue`; project facts in `.qa/config.json`.
 - **Packaging.** Claude Code plugin with its own marketplace manifest.
 
+## Done (0.6.0): test library and deterministic Test plans
+
+- **Scripts from transcripts.** Playwright MCP reports the code of every browser action, so
+  `usage --batch --transcript` turns each passing case into `.qa/tests/<plan>/<tc>.json`: setup
+  (login), actions per step, annotated captures and recording points, with the login as
+  `{{user}}`/`{{secret}}`. Versioned; approving the source run marks a script verified.
+- **Test plans (suites).** Created in the viewer (name, tags, tests picked by hand or by tag) or
+  with `qa-runs suite`; stored in `.qa/suites/`.
+- **Deterministic replay.** `replay.mjs` drives the pinned Playwright MCP over stdio without an
+  agent; capture marks are the assertions; results land as a normal run at $0. The dashboard
+  filters agent runs from deterministic ones.
+- **Repair.** A failed replay case becomes a one-case agent run (`heal`); its passing script is
+  the next version.
+
+Next: `{{stamp}}`-style tokens for data that must be unique per run, and launching the repair
+agent from the viewer without a Claude Code session.
+
 ## Done (0.5.0): faster, cheaper agents
 
 Measured on 20 real Test Agent transcripts (all Sonnet): 97.6% of tokens were cache reads, so

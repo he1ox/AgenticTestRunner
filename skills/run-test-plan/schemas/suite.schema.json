@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "run-test-plan/suite.schema.json",
+  "title": "Test plan (suite of library tests)",
+  "description": "Made in the viewer's Test plans view or with `qa-runs suite create`. Lives in .qa/suites/<id>.json. Running it replays each test deterministically, without an agent.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "name", "tests"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$", "description": "Slug of the name at creation; prefixes every run id." },
+    "name": { "type": "string", "examples": ["Release 1.0.1"] },
+    "description": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" }, "examples": [["smoke", "regression"]] },
+    "tests": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$" }, "description": "Library test ids (PLAN/TC), in the order they run within their group." },
+    "createdAt": { "type": "string" },
+    "updatedAt": { "type": "string" }
+  }
+}

@@ -29,6 +29,11 @@ plan.json ──init──▶ brief.md per case ──Test Agent (browser)──
   spotlight, blur), recordings, a per-case agent chat, and Approve / Needs retest / Reject.
 - **Reference comparison.** Optionally compare each case against another app (legacy,
   production, a design) and report deviations.
+- **Test library and Test plans.** Every case an agent passes is saved as a script, read from
+  the agent's transcript at no extra cost: same steps, same annotated screenshots, same
+  recording. In the viewer you group scripts into Test plans ("Release 1.0.1", tags `smoke`,
+  `regression`…) and run them deterministically: no agent, no tokens. When a replay fails because
+  the UI changed on purpose, "Repair with agent" re-records just that case.
 - **Memory.** When an agent needs a value it does not have, it asks you in the viewer and waits.
   Tick "Remember" and later runs in the same situation reuse the answer. Agents also propose
   what they learned; nothing is reused until you approve it. Secrets are stored only as
@@ -125,7 +130,7 @@ at a time. Use `"shared"` when one user may be logged in from several browsers. 
 `skills/run-test-plan/schemas/config.schema.json`. Passwords stay in environment variables.
 
 Add `.qa/runs/` to `.gitignore`; commit `.qa/memory/` to share what agents learned with your
-team. `examples/` holds a complete config, plan and memory.
+team, and `.qa/tests/` and `.qa/suites/` (the test library and Test plans). `examples/` holds a complete config, plan and memory.
 
 ## Use
 
@@ -155,6 +160,26 @@ node skills/run-test-plan/scripts/qa-runs.mjs memory --help
 | `QA_BROWSER_ARGS` | none | Extra Playwright MCP flags for every browser, e.g. `--headless` |
 | `QA_CLAUDE_BIN` | `claude` | Claude Code binary the chat runs |
 | `QA_USER_MEMORY_DIR` | `~/.claude/qa-memory` | Personal memory folder |
+| `QA_PASSWORD` | none | Password deterministic replays type when the account has no `secret` |
+| `QA_REPLAY_DEBUG` | off | Print every action a deterministic replay sends and the browser's reply |
+
+### Test plans: deterministic runs
+
+Once agents have passed some cases, open the viewer's **Tests** view to see the library (tags,
+draft or verified, last replay) and **Test plans** to create one: name it, add your tags, pick
+tests (or every test with a tag) and press **Run**. The run replays each script in its own
+headless browser and shows up like any other run, marked Deterministic, at $0. The same from the
+terminal:
+
+```bash
+node skills/run-test-plan/scripts/qa-runs.mjs tests --tag smoke
+node skills/run-test-plan/scripts/qa-runs.mjs suite create "Release 1.0.1" --tags smoke,regression --tag smoke
+node skills/run-test-plan/scripts/qa-runs.mjs suite run release-1.0.1
+```
+
+Scripts type the login password from the account's `env:NAME` secret or `QA_PASSWORD`, so start
+the viewer from a shell that has them. See
+[`references/library.md`](skills/run-test-plan/references/library.md).
 
 `profile` shows where agents' tokens went (context size per turn, tool results by tool), from any
 transcripts, so you can measure a change against earlier runs.

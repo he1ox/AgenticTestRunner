@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "run-test-plan/test-script.schema.json",
+  "title": "Library test (replayable script)",
+  "description": "Saved from a Test Agent's transcript when a case passes (`usage --batch --transcript`). Lives in .qa/tests/<planId>/<tcId>.json; older versions in .history/. Never contains credentials: the login is {{user}} and {{secret}}, filled in memory at replay time.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "planId", "tcId", "title", "steps", "status", "version", "recordedFrom"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$", "description": "PLAN/TC" },
+    "planId": { "type": "string" },
+    "tcId": { "type": "string" },
+    "title": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" }, "description": "From the plan case at first recording; edited in the viewer after that and kept across versions." },
+    "group": { "type": ["string", "null"], "description": "Cases of one group replay together, in one browser, in `order`." },
+    "order": { "type": "integer" },
+    "variants": { "type": "object", "additionalProperties": { "type": "string" } },
+    "target": { "type": "object", "properties": { "app": { "type": ["string", "null"] } } },
+    "account": {
+      "type": ["object", "null"],
+      "properties": {
+        "user": { "type": "string" },
+        "secret": { "type": "string", "pattern": "^env:[A-Za-z_][A-Za-z0-9_]*$", "description": "Where the replay runner reads the password; QA_PASSWORD otherwise." }
+      }
+    },
+    "preconditions": { "type": "array", "items": { "type": "string" } },
+    "data": { "type": "object" },
+    "setup": { "type": "array", "items": { "$ref": "#/$defs/action" }, "description": "What the agent did before marking its first case running (the login); run once per group." },
+    "recordedAfter": { "type": "array", "items": { "type": "string" }, "description": "Earlier cases of the same agent session when there was no separate setup: this test may depend on them." },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["n", "action", "actions"],
+        "properties": {
+          "n": { "type": "integer" },
+          "action": { "type": "string" },
+          "expected": { "type": "string" },
+          "evidence": { "type": "array", "items": { "type": "string" }, "description": "The files the agent reported for this step; a replay retakes them under the same names." },
+          "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
+          "coveredBy": { "type": "integer", "description": "This step had no actions of its own; they were recorded with step n." }
+        }
+      }
+    },
+    "expected": { "type": "string" },
+    "record": { "type": "boolean" },
+    "status": { "enum": ["draft", "verified"], "description": "verified once a reviewer approves the run it was recorded from." },
+    "version": { "type": "integer", "minimum": 1 },
+    "recordedFrom": {
+      "type": "object",
+      "properties": { "runId": { "type": "string" }, "tcId": { "type": "string" }, "model": { "type": ["string", "null"] }, "at": { "type": "string" } }
+    },
+    "lastReplay": {
+      "type": "object",
+      "properties": { "runId": { "type": "string" }, "status": { "type": "string" }, "at": { "type": "string" } }
+    }
+  },
+  "$defs": {
+    "action": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "code"],
+          "properties": {
+            "kind": { "const": "code" },
+            "tool": { "type": "string", "description": "The Playwright MCP tool that produced the code (click, type, navigate…)." },
+            "code": { "type": "string", "description": "Playwright code as Playwright MCP reported it (\"Ran Playwright code\")." }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "file", "marks"],
+          "properties": {
+            "kind": { "const": "capture" },
+            "file": { "type": "string" },
+            "marks": { "type": "string", "description": "The marks array as JavaScript source; every selector must be found during replay." },
+            "optional": { "type": "array", "items": { "type": "string" }, "description": "Selectors the agent's own capture did not find either." }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "action"],
+          "properties": { "kind": { "const": "rec" }, "action": { "enum": ["start", "stop"] } }
+        }
+      ]
+    }
+  }
+}

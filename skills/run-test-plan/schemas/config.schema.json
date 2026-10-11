@@ -14,6 +14,16 @@
       "type": "string",
       "default": ".qa/plans"
     },
+    "testsDir": {
+      "type": "string",
+      "default": ".qa/tests",
+      "description": "Test library: one replayable script per case an agent passed (version it with the project)."
+    },
+    "suitesDir": {
+      "type": "string",
+      "default": ".qa/suites",
+      "description": "Test plans made in the viewer (suites): a name, tags and library tests."
+    },
     "viewerPort": {
       "type": "integer",
       "default": 4321
@@ -74,7 +84,7 @@
       "additionalProperties": {
         "type": "string"
       },
-      "description": "Project skills a Test Agent may invoke on demand, by purpose: login, navigate, fileBug\u2026",
+      "description": "Project skills a Test Agent may invoke on demand, by purpose: login, navigate, fileBug…",
       "examples": [
         {
           "login": "my-login-skill",
@@ -258,6 +268,18 @@
           "type": "boolean",
           "default": true,
           "description": "Re-run once on the standard tier any case a haiku batch reports as fail, blocked, unfinished or with contract warnings."
+        },
+        "replayTimeoutMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "default": 15000,
+          "description": "How long a deterministic replay waits for an element before the step fails."
+        },
+        "replayNavigationTimeoutMs": {
+          "type": "integer",
+          "minimum": 5000,
+          "default": 60000,
+          "description": "How long a deterministic replay waits for a page to load."
         }
       }
     }
