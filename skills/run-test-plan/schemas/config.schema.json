@@ -172,7 +172,7 @@
                 "additionalProperties": {
                   "type": "string"
                 },
-                "description": "Only batches with these variant values may use this account (a store-bound user, say)."
+                "description": "Only batches with these variant values may use this account (a user tied to one tenant, say)."
               }
             }
           }

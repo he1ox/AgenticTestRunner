@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "run-test-plan/test-plan.schema.json",
   "title": "Test plan (orchestrator → Test Agent)",
-  "description": "What to test. Authored by the orchestrator, approved by the human, frozen into each run as plan.json. Never contains credentials. schemaVersion 1 plans (pos3Url/pos2Url, territory/store, parityCheck, jira) are still accepted and mapped on load.",
+  "description": "What to test. Authored by the orchestrator, approved by the human, frozen into each run as plan.json. Never contains credentials.",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -12,11 +12,7 @@
   ],
   "properties": {
     "schemaVersion": {
-      "enum": [
-        1,
-        2
-      ],
-      "description": "Write 2. Version 1 is read for old runs only."
+      "const": 2
     },
     "id": {
       "type": "string",
@@ -131,14 +127,14 @@
         },
         "group": {
           "type": "string",
-          "description": "Cases sharing a group run in ONE agent, in plan order (shared login/store/form)."
+          "description": "Cases sharing a group run in ONE agent, in plan order (shared login/data/form)."
         },
         "variants": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Axes the behaviour forks on (country, store, role, plan tier…). Keys and allowed values come from variants in .qa/config.json."
+          "description": "Axes the behaviour forks on (device, account type, role, plan tier…). Keys and allowed values come from variants in .qa/config.json."
         },
         "tags": {
           "type": "array",

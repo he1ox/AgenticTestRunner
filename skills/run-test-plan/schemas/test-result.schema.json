@@ -13,11 +13,7 @@
   ],
   "properties": {
     "schemaVersion": {
-      "enum": [
-        1,
-        2
-      ],
-      "description": "Write 2."
+      "const": 2
     },
     "testCaseId": {
       "type": "string"

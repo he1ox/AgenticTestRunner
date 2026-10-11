@@ -14,8 +14,8 @@
     {
       "id": "TC-1",
       "title": "Empty email blocks payment",
-      "group": "us-cashier",
-      "variants": { "country": "US", "role": "cashier" },
+      "group": "desktop-guest",
+      "variants": { "device": "desktop", "account": "guest" },
       "data": { "item": "SKU-TEST-001" },
       "steps": [
         { "n": 1, "action": "Add SKU-TEST-001 to the cart and open checkout" },
@@ -25,11 +25,11 @@
     },
     {
       "id": "TC-2",
-      "title": "Manager sees the same rule",
-      "group": "mx-manager",
-      "variants": { "country": "MX", "role": "manager" },
-      "steps": [{ "n": 1, "action": "Repeat TC-1 as a manager; enter the coupon code if asked", "expected": "Same inline error" }],
-      "expected": "The rule does not depend on role.",
+      "title": "Members on mobile see the same rule",
+      "group": "mobile-member",
+      "variants": { "device": "mobile", "account": "member" },
+      "steps": [{ "n": 1, "action": "Repeat TC-1 signed in as a member on mobile; enter the coupon code if asked", "expected": "Same inline error" }],
+      "expected": "The rule does not depend on device or account type.",
       "referenceCheck": "always"
     }
   ]

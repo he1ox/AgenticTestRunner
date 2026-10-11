@@ -40,7 +40,7 @@ Run the test cases for SHOP-42 on QA, with recording
 ## Setup
 
 - Node.js 20+ (no npm dependencies)
-- Browsers: the [qa-runner plugin](https://github.com/jorgeebits/qa-runner) brings its own pool of three isolated browsers and dedicated Test Agents (parallel runs). This folder alone also works, one agent at a time, with a Playwright MCP server registered as `playwright`: `claude mcp add playwright -- npx @playwright/mcp@0.0.82`
+- Browsers: the [qa-runner plugin](https://github.com/he1ox/AgenticTestRunner) brings its own pool of three isolated browsers and dedicated Test Agents (parallel runs). This folder alone also works, one agent at a time, with a Playwright MCP server registered as `playwright`: `claude mcp add playwright -- npx @playwright/mcp@0.0.82`
 - `ffmpeg` on the PATH, only for recordings
 - Optional per-project settings in `.qa/config.json` (see `schemas/config.schema.json`). Add `.qa/runs/` to `.gitignore`.
 - Credentials are never stored: pass them in the agent prompt or as `env:NAME` references.
@@ -48,19 +48,23 @@ Run the test cases for SHOP-42 on QA, with recording
 ## Installation
 
 ```bash
-claude plugin install appdev@ezcorp
+claude plugin marketplace add he1ox/AgenticTestRunner
 ```
 
-Or copy the folder: `cp -r skills/appdev/qa/run-test-plan .claude/skills/`
+```bash
+claude plugin install qa-runner@qa-runner
+```
 
-Source and issues: https://github.com/jorgeebits/qa-runner (this folder is synced from there).
+Then call it as `/qa-runner:run-test-plan`, or copy the folder into a project:
+`cp -r skills/run-test-plan .claude/skills/`
+
+Source and issues: https://github.com/he1ox/AgenticTestRunner
 
 ## Metadata
 
 | Field | Value |
 |-------|-------|
 | Author | @jorgeebits |
-| Domain | `appdev/qa` |
 | Version | 0.5.0 |
 | Last updated | 2026-10-06 |
 | Target Project | Any web app — QA / non-prod |
