@@ -44,17 +44,22 @@ plan.json ──init──▶ brief.md per case ──Test Agent (browser)──
 
 ## Install
 
-1. Add this repo as a plugin marketplace and install the plugin:
+This fork ([he1ox/AgenticTestRunner](https://github.com/he1ox/AgenticTestRunner)) is its own
+plugin marketplace. Its marketplace and plugin are both named `qa-runner`, so if you already
+added the upstream `jorgeebits/qa-runner` marketplace, remove it first with
+`claude plugin marketplace remove qa-runner`.
+
+1. Add the fork as a plugin marketplace and install the plugin:
 
    ```bash
-   claude plugin marketplace add jorgeebits/qa-runner
+   claude plugin marketplace add he1ox/AgenticTestRunner
    ```
 
    ```bash
    claude plugin install qa-runner@qa-runner
    ```
 
-   Inside a Claude Code session the same steps are `/plugin marketplace add jorgeebits/qa-runner`
+   Inside a Claude Code session the same steps are `/plugin marketplace add he1ox/AgenticTestRunner`
    and `/plugin install qa-runner@qa-runner`. Restart Claude Code afterwards so the
    `run-test-plan` skill loads.
 
@@ -69,14 +74,26 @@ plan.json ──init──▶ brief.md per case ──Test Agent (browser)──
 3. Optional, for recordings: install `ffmpeg` (`winget install Gyan.FFmpeg`,
    `brew install ffmpeg` or `sudo apt install ffmpeg`) and make sure it is on the PATH.
 
-4. Check the install with `claude plugin list` and `claude mcp list`.
+4. Check the install with `claude plugin list` and `claude mcp list`. `qa-runner@qa-runner`
+   should be listed as enabled, and `qa-browser-1..3` should appear once a session has started.
+
+5. Use the skill from the Claude Code CLI: open `claude` in the project you want to test and
+   ask for it in plain words ("run the test plan for SHOP-42"), or call it directly with
+   `/qa-runner:run-test-plan` (see [Use](#use)).
 
 To update, run `claude plugin marketplace update qa-runner` and then
 `claude plugin update qa-runner@qa-runner`. To remove it, run
 `claude plugin uninstall qa-runner@qa-runner`.
 
-To work on the plugin itself, clone the repo and add the local folder instead:
-`claude plugin marketplace add ./qa-runner`.
+To work on the plugin itself, clone the fork and add the local folder instead:
+
+```bash
+git clone https://github.com/he1ox/AgenticTestRunner.git
+```
+
+```bash
+claude plugin marketplace add ./AgenticTestRunner
+```
 
 ## Set up a project
 
@@ -87,7 +104,7 @@ Create `.qa/config.json` in the project you test (every field is optional; see
 {
   "tracker": { "name": "GitHub", "issueUrl": "https://github.com/org/repo/issues/{key}" },
   "targets": { "app": "New checkout", "reference": "Legacy checkout" },
-  "variants": { "country": { "label": "Country", "values": ["US", "CA", "MX"] } },
+  "variants": { "device": { "label": "Device", "values": ["desktop", "mobile"] } },
   "capabilities": { "login": "my-app-login" },
   "execution": {
     "sessions": "exclusive",
@@ -140,9 +157,6 @@ node skills/run-test-plan/scripts/qa-runs.mjs memory --help
 
 `profile` shows where agents' tokens went (context size per turn, tool results by tool), from any
 transcripts, so you can measure a change against earlier runs.
-
-Plans and results written with `schemaVersion: 1` still load; they are mapped to version 2 when
-read.
 
 ## Develop
 
