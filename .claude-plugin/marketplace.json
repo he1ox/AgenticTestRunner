@@ -1,5 +1,5 @@
 {
-  "name": "qa-runner",
+  "name": "AgenticTestRunner",
   "owner": { "name": "jorge.lopezg" },
   "plugins": [
     {

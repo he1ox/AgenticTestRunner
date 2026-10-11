@@ -52,7 +52,7 @@ claude plugin marketplace add he1ox/AgenticTestRunner
 ```
 
 ```bash
-claude plugin install qa-runner@qa-runner
+claude plugin install qa-runner@AgenticTestRunner
 ```
 
 Then call it as `/qa-runner:run-test-plan`, or copy the folder into a project:

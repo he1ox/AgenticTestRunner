@@ -45,9 +45,10 @@ plan.json ──init──▶ brief.md per case ──Test Agent (browser)──
 ## Install
 
 This fork ([he1ox/AgenticTestRunner](https://github.com/he1ox/AgenticTestRunner)) is its own
-plugin marketplace. Its marketplace and plugin are both named `qa-runner`, so if you already
-added the upstream `jorgeebits/qa-runner` marketplace, remove it first with
-`claude plugin marketplace remove qa-runner`.
+plugin marketplace. The marketplace is named `AgenticTestRunner`, after the repo, and the
+plugin `qa-runner`. If you already installed the upstream plugin from the `jorgeebits/qa-runner`
+marketplace, uninstall it first with `claude plugin uninstall qa-runner@qa-runner`: both register
+the same agents and browser tools.
 
 1. Add the fork as a plugin marketplace and install the plugin:
 
@@ -56,11 +57,11 @@ added the upstream `jorgeebits/qa-runner` marketplace, remove it first with
    ```
 
    ```bash
-   claude plugin install qa-runner@qa-runner
+   claude plugin install qa-runner@AgenticTestRunner
    ```
 
    Inside a Claude Code session the same steps are `/plugin marketplace add he1ox/AgenticTestRunner`
-   and `/plugin install qa-runner@qa-runner`. Restart Claude Code afterwards so the
+   and `/plugin install qa-runner@AgenticTestRunner`. Restart Claude Code afterwards so the
    `run-test-plan` skill loads.
 
 2. Nothing else to register: the plugin starts its browser pool and Test Agents itself. Only if
@@ -74,16 +75,16 @@ added the upstream `jorgeebits/qa-runner` marketplace, remove it first with
 3. Optional, for recordings: install `ffmpeg` (`winget install Gyan.FFmpeg`,
    `brew install ffmpeg` or `sudo apt install ffmpeg`) and make sure it is on the PATH.
 
-4. Check the install with `claude plugin list` and `claude mcp list`. `qa-runner@qa-runner`
+4. Check the install with `claude plugin list` and `claude mcp list`. `qa-runner@AgenticTestRunner`
    should be listed as enabled, and `qa-browser-1..3` should appear once a session has started.
 
 5. Use the skill from the Claude Code CLI: open `claude` in the project you want to test and
    ask for it in plain words ("run the test plan for SHOP-42"), or call it directly with
    `/qa-runner:run-test-plan` (see [Use](#use)).
 
-To update, run `claude plugin marketplace update qa-runner` and then
-`claude plugin update qa-runner@qa-runner`. To remove it, run
-`claude plugin uninstall qa-runner@qa-runner`.
+To update, run `claude plugin marketplace update AgenticTestRunner` and then
+`claude plugin update qa-runner@AgenticTestRunner`. To remove it, run
+`claude plugin uninstall qa-runner@AgenticTestRunner`.
 
 To work on the plugin itself, clone the fork and add the local folder instead:
 
