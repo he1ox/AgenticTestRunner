@@ -119,7 +119,7 @@ export function saveSchedule(runId, schedule) {
 }
 
 // Accounts come from .qa/config.json, or the plan's login when there is no pool. An account
-// with variants only serves batches with the same variants (a store-bound user, say).
+// with variants only serves batches with the same variants (a user tied to one tenant, say).
 function accountsFor(batch) {
   const { accounts } = execution();
   const pool = accounts.length ? accounts : batch.user ? [{ user: batch.user }] : [{ user: null }];

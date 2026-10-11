@@ -73,51 +73,6 @@ export function displayPath(path) {
 export const issueUrl = (key) =>
   key && CONFIG.tracker?.issueUrl ? CONFIG.tracker.issueUrl.replace('{key}', encodeURIComponent(key)) : null;
 
-// Plans and results are read as schemaVersion 2. Version 1 files (written before the runner was
-// generic) are mapped on load, so old runs keep rendering without being rewritten on disk.
-export function normalizePlan(plan) {
-  if (!plan || plan.__parseError || plan.schemaVersion >= 2) return plan;
-  const { pos3Url, pos2Url, employee, ...environment } = plan.environment || {};
-  const { parityCheck, ...defaults } = plan.defaults || {};
-  return {
-    ...plan,
-    schemaVersion: 2,
-    issue: plan.issue ?? plan.jira,
-    environment: {
-      ...environment,
-      targets: { ...(pos3Url && { app: pos3Url }), ...(pos2Url && { reference: pos2Url }) },
-      ...(employee && { user: employee }),
-    },
-    defaults: { ...defaults, ...(parityCheck && { referenceCheck: parityCheck }) },
-    testCases: (plan.testCases || []).map(({ territory, store, parityCheck: check, ...tc }) => ({
-      ...tc,
-      variants: { ...(territory && { territory }), ...(store && { store }), ...tc.variants },
-      ...(check && { referenceCheck: check }),
-    })),
-  };
-}
-
-export function normalizeResult(result) {
-  if (!result || result.__parseError || result.schemaVersion >= 2) return result;
-  const { pos3Version, serverVersion, store, territory, ...environment } = result.environment || {};
-  const { parity, ...rest } = result;
-  return {
-    ...rest,
-    schemaVersion: 2,
-    environment: {
-      ...environment,
-      versions: { ...(pos3Version && { app: pos3Version }), ...(serverVersion && { server: serverVersion }) },
-      variants: { ...(territory && { territory }), ...(store && { store }) },
-    },
-    defects: (result.defects || []).map(({ pos2Parity, jira, ...d }) => ({
-      ...d,
-      ...(pos2Parity && { reference: pos2Parity }),
-      ...((d.issue ?? jira) && { issue: d.issue ?? jira }),
-    })),
-    ...(parity && { reference: parity }),
-  };
-}
-
 export const runDir = (runId) => safeJoin(RUNS_DIR, runId);
 export const tcDir = (runId, tcId) => safeJoin(runDir(runId), 'tc', tcId);
 
@@ -152,13 +107,13 @@ export function listRuns() {
 
 export function loadRun(runId) {
   const dir = runDir(runId);
-  const plan = normalizePlan(readJson(join(dir, 'plan.json'), {}));
+  const plan = readJson(join(dir, 'plan.json'), {});
   const meta = readJson(join(dir, 'meta.json'), {});
   const review = readJson(join(dir, 'review.json'), {});
   const executed = executedBy(readJson(join(dir, 'schedule.json'), null));
   const testCases = (plan.testCases || []).map((tc) => {
     const base = join(dir, 'tc', tc.id);
-    const result = normalizeResult(readJson(join(base, 'result.json')));
+    const result = readJson(join(base, 'result.json'));
     const progress = readJson(join(base, 'progress.json'));
     const questions = readJson(join(base, 'questions.json'), []);
     const evidenceDir = join(base, 'evidence');

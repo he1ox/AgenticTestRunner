@@ -60,7 +60,6 @@ import {
   displayPath,
   listRuns,
   loadRun,
-  normalizePlan,
   readJson,
   runDir,
   stamp,
@@ -90,7 +89,7 @@ const fail = (message) => {
 async function init() {
   const planFile = args[0] && resolve(args[0]);
   if (!planFile || !existsSync(planFile)) fail('init needs an existing plan file.');
-  const plan = normalizePlan(readJson(planFile));
+  const plan = readJson(planFile);
   if (!plan || plan.__parseError) fail(`plan is not valid JSON: ${plan?.__parseError}`);
   const problems = checkPlan(plan);
   if (problems.length) fail(`plan has problems:\n- ${problems.join('\n- ')}`);
@@ -179,6 +178,7 @@ function checkPlan(plan) {
   const problems = [];
   if (!plan.id || !/^[A-Za-z0-9._-]+$/.test(plan.id))
     problems.push('id is required and may only use letters, digits, . _ -');
+  if (plan.schemaVersion !== 2) problems.push('schemaVersion must be 2');
   if (!plan.title) problems.push('title is required');
   const known = Object.keys(CONFIG.variants || {});
   if (!Array.isArray(plan.testCases) || !plan.testCases.length) problems.push('testCases must be a non-empty array');
@@ -797,7 +797,7 @@ memory show <id>                    one memory in full
 memory recall "<query>" [--run R --tc T] [--limit 5]
                                     best matches, scoped to the case's variants when --run/--tc are given
 memory add --text "<what it is>" [--value v | --secret-ref env:NAME] [--kind data|procedure|env-quirk|gotcha]
-           [--triggers "a,b"] [--variants '{"country":"MX"}'] [--target app] [--expires YYYY-MM-DD]
+           [--triggers "a,b"] [--variants '{"device":"mobile"}'] [--target app] [--expires YYYY-MM-DD]
            [--share project|user] [--status proposed]
 memory used <id> [--failed]         report whether a recalled memory worked (2 failures → stale)
 memory approve|stale|reject <id>    curate (reject deletes)
@@ -841,7 +841,7 @@ function memory() {
         try {
           variants = JSON.parse(flags.variants);
         } catch {
-          fail('--variants must be JSON, e.g. \'{"country":"MX"}\'');
+          fail('--variants must be JSON, e.g. \'{"device":"mobile"}\'');
         }
       const scope = { ...(variants && { variants }), ...(flags.target && { target: flags.target }) };
       const entry = addMemory(

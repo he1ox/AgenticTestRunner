@@ -3,8 +3,8 @@
   "tracker": { "name": "GitHub", "issueUrl": "https://github.com/example/shop/issues/{key}" },
   "targets": { "app": "New checkout", "reference": "Legacy checkout" },
   "variants": {
-    "country": { "label": "Country", "values": ["US", "CA", "MX"] },
-    "role": { "label": "Role", "values": ["cashier", "manager"] }
+    "device": { "label": "Device", "values": ["desktop", "mobile"] },
+    "account": { "label": "Account", "values": ["guest", "member"] }
   },
   "capabilities": { "login": "my-app-login" }
 }

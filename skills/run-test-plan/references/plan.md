@@ -3,7 +3,7 @@
 - Reuse `.qa/plans/<KEY>.plan.json` when it exists; update it rather than writing a new one.
 - Otherwise read the ticket (description, latest comments, blocking bugs) and draft the plan
   following `schemas/test-plan.schema.json` (`schemaVersion: 2`).
-- If behaviour forks by a variant (country, role, plan tier…) or the comparison with the
+- If behaviour forks by a variant (device, role, plan tier…) or the comparison with the
   reference app is unclear, spawn ONE read-only research agent (model `sonnet`, effort `low`) to study the code
   and write a discovery file of at most 120 lines next to the plan, replying in at most 15 lines.
   List that file in `references` with a section hint, so Test Agents read only their slice.

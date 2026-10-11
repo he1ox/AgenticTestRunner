@@ -8,8 +8,7 @@
   `references/` and is read when the workflow reaches it. The chat agent gets file paths only
   and loads the mark syntax with `annotate --help` the first time it needs it.
 - **Phase 2, generic contract.** `schemaVersion: 2` plans and results with `targets`,
-  free-form `variants`, `referenceCheck` and `issue`; project facts in `.qa/config.json`;
-  version 1 files are mapped on load.
+  free-form `variants`, `referenceCheck` and `issue`; project facts in `.qa/config.json`.
 - **Packaging.** Claude Code plugin with its own marketplace manifest.
 
 ## Done (0.5.0): faster, cheaper agents
@@ -89,15 +88,15 @@ pull requests) or `~/.claude/qa-memory/` (personal):
 ---
 id: m-0042
 kind: data            # data | procedure | env-quirk | gotcha
-scope: { variants: { country: MX }, target: app }
-triggers: ["manager override", "#managerId"]
-value: "qa-manager-02"   # or secretRef: env:QA_MANAGER_PASSWORD, never the secret itself
+scope: { variants: { account: member }, target: app }
+triggers: ["approver", "#approverId"]
+value: "qa-approver-02"  # or secretRef: env:QA_APPROVER_PASSWORD, never the secret itself
 source: { run: SHOP-42_20261005-162137, tc: TC-4, confirmedBy: human }
 stats: { used: 3, failed: 0, lastUsed: 2026-10-05 }
 expires: 2026-12-31
 status: active        # proposed | active | stale
 ---
-Manager override in MX stores: use this user.
+Approval step for member orders: use this user.
 ```
 
 **Learn.**
