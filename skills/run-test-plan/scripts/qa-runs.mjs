@@ -47,6 +47,10 @@
 //                             Replay every test of a suite without an agent (no tokens).
 //   replay <runId>            Execute a run the viewer prepared (spawned by the server).
 //   heal <runId> <tcId>       New agent run of one failed replay case; its script replaces the old.
+//   export [<PLAN/TC>…] [--tag t] [--suite id] [--plan P] [--out e2e/qa] [--force] [--config]
+//                             Write the scripts as Playwright Test files (.spec.ts), one per
+//                             script (one per plan group); no selector = the whole library.
+//                             --config adds a playwright.config.ts if the project has none.
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -73,6 +77,7 @@ import { doctor as runDoctor } from './doctor.mjs';
 import { resolveHarness } from './harness.mjs';
 import { buildSchedule, escalate, execution, finishBatch, nextLaunch, readSchedule, saveSchedule } from './schedule.mjs';
 import { executeRun, prepareSuiteRun } from './replay.mjs';
+import { exportPlaywright } from './export-playwright.mjs';
 import { browserProfile, mergeProfiles, parseTranscript, recordUsage, runCost } from './usage.mjs';
 import {
   captureCode,
@@ -1000,6 +1005,26 @@ async function heal() {
   console.log(`NEXT in your agent: "run-test-plan: execute run ${healId}, already initialized (references/execute.md, from \`next\`)"`);
 }
 
+// Library scripts → Playwright Test files (export-playwright.mjs). A bare flag swallows the
+// argument after it (`--force SHOP-42/TC-1`), so hand that back as a test id.
+function exportSpecs() {
+  for (const key of ['force', 'config']) if (typeof flags[key] === 'string') args.push(flags[key]);
+  try {
+    const { lines } = exportPlaywright({
+      ids: args,
+      tag: flags.tag,
+      suite: flags.suite,
+      plan: flags.plan,
+      ...(typeof flags.out === 'string' && { out: flags.out }),
+      force: Boolean(flags.force),
+      config: Boolean(flags.config),
+    });
+    for (const line of lines) console.log(line);
+  } catch (error) {
+    fail(error.message);
+  }
+}
+
 async function doctor() {
   const checks = await runDoctor({ harness: flags.harness, browser: Boolean(flags.browser) });
   for (const { ok, label, fix } of checks) {
@@ -1010,7 +1035,7 @@ async function doctor() {
 }
 
 // Dispatch last, so every function and constant above is initialized before a command runs.
-const commands = { init: () => init(), doctor, open, serve, mark, next, validate, status, latest, annotate, ask, answer, questions, memory, usage, profile, tests, suite, replay, heal };
+const commands = { init: () => init(), doctor, open, serve, mark, next, validate, status, latest, annotate, ask, answer, questions, memory, usage, profile, tests, suite, replay, heal, export: exportSpecs };
 if (!commands[command]) {
   console.log(
     readFileSync(new URL(import.meta.url), 'utf8')

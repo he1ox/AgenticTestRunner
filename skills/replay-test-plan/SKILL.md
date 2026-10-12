@@ -60,6 +60,25 @@ regressed (review it like any failure) or the UI changed on purpose and the scri
 from the original steps and the failure. Execute it with the **run-test-plan** skill's normal loop (`next` → launch → `usage --batch`);
 when the agent passes, its script becomes the next version of the same test.
 
+## Export to Playwright
+
+When the team wants the tests as their own Playwright code (CI they already run, SDETs who
+review `.spec.ts`), export them; the library stays the source for qa-runner's own runs:
+
+```
+$Q export [<PLAN/TC>…] [--tag smoke] [--suite <id>] [--plan SHOP-42] [--out e2e/qa] [--force] [--config]
+```
+
+- One `<out>/<plan>/<tc>.spec.ts` per script; a plan group (one browser session) is one serial
+  file. No selector exports the whole library. Then `npx playwright test` (the project needs
+  `@playwright/test`).
+- Login → `beforeEach` with `process.env.<NAME>` for the account's `env:NAME` secret
+  (`QA_PASSWORD` otherwise); steps → `test.step`; recorded code as is, with URLs of the
+  target app behind `BASE_URL` (`QA_BASE_URL`); each mark → `expect(…).toBeVisible()`;
+  untranslatable actions and captures without marks → `// TODO(qa-runner)` comments.
+- Same scripts, same bytes. A file that differs (edited by hand) is skipped unless `--force`;
+  `--config` writes `playwright.config.ts` only if the project has no Playwright config.
+
 ## Limits
 
 - Data that must be unique per run (a name created twice) can fail on replay; edit the value in

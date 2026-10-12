@@ -13,6 +13,7 @@ import { addMemory, findMemory, loadMemories, removeMemory, updateMemory } from 
 import { answerQuestion } from './questions.mjs';
 import { PRICING_AS_OF } from './pricing.mjs';
 import { prepareSuiteRun } from './replay.mjs';
+import { exportPlaywright } from './export-playwright.mjs';
 import { deleteSuite, listSuites, listTests, readSuite, reviewRecorded, saveSuite, updateTest } from './tests.mjs';
 import { runCost } from './usage.mjs';
 import {
@@ -249,9 +250,19 @@ async function saveReview(req, res, runId, tcId) {
 
 const QA_RUNS = join(SKILL_DIR, 'scripts', 'qa-runs.mjs');
 
-// The library of replayable scripts: read it all, or change a test's tags or status.
+// The library of replayable scripts: read it all, change a test's tags or status, or export
+// tests to Playwright files (POST /api/tests/export {ids}; never overwrites a changed file).
 async function tests(req, res, planId, tcId) {
   if (req.method === 'GET') return send(res, 200, listTests());
+  if (req.method === 'POST' && planId === 'export' && !tcId)
+    try {
+      const { ids } = await readBody(req);
+      if (!Array.isArray(ids) || !ids.length) return send(res, 400, { error: 'pick the tests to export' });
+      const { lines, files } = exportPlaywright({ ids: ids.map(String) });
+      return send(res, 200, { lines, files: files.map(({ file, state, todos, tests }) => ({ file, state, todos, tests })) });
+    } catch (error) {
+      return send(res, error.status || 400, { error: error.message });
+    }
   if (req.method !== 'PUT' || !planId || !tcId) return send(res, 405, { error: 'use GET, or PUT /api/tests/<plan>/<tc>' });
   const body = await readBody(req);
   try {

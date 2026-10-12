@@ -235,6 +235,27 @@ the viewer from a shell that has them. See the
 `profile` shows where agents' tokens went (context size per turn, tool results by tool), from any
 transcripts, so you can measure a change against earlier runs.
 
+### Export to Playwright
+
+The library is plain JSON, but you don't have to keep it there: `export` writes standard
+[Playwright Test](https://playwright.dev/docs/intro) files your team can run, review and own,
+with a stock `npx playwright test`:
+
+```bash
+node skills/run-test-plan/scripts/qa-runs.mjs export --tag smoke --out e2e/qa --config
+npx playwright test --grep @smoke
+```
+
+One `.spec.ts` per script (`e2e/qa/<plan>/<tc>.spec.ts`; a plan group that shares one browser
+session becomes one serial file). The login becomes a `beforeEach` that reads the password from
+`process.env` (never written to the file), each plan step a `test.step`, the recorded
+Playwright code is kept as is, and every screenshot mark becomes a `toBeVisible()` assertion
+with the screenshot attached to the report. What can't be translated is left as a
+`// TODO(qa-runner)` comment. Selectors: test ids, `--tag`, `--suite`, `--plan`; output is
+deterministic, and a file you edited is only replaced with `--force`. `--config` adds a
+`playwright.config.ts` when the project has none. The viewer's **Tests** view has the same
+action for the tests its filters show.
+
 ## Develop
 
 See [AGENTS.md](AGENTS.md). In short: the Test Agents' rules live in
