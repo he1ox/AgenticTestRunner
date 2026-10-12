@@ -232,6 +232,29 @@ Scripts type the login password from the account's `env:NAME` secret or `QA_PASS
 the viewer from a shell that has them. See the
 [`replay-test-plan`](skills/replay-test-plan/SKILL.md) skill.
 
+### Run in CI
+
+`--ci` turns a Test plan into a pipeline gate: no viewer window, no agent, a line per case and
+the totals, and an exit code (0 passed, 1 a case failed, 2 the run could not start).
+
+```bash
+node skills/run-test-plan/scripts/qa-runs.mjs suite run smoke --ci --junit qa-junit.xml
+```
+
+- `--fail-on fail|blocked|fail,blocked|none` picks which statuses fail the job; the default is
+  `fail,blocked`, since a blocked case (no login, a removed script) proved nothing.
+- `--junit <path>` writes a JUnit report: one testsuite for the plan, one testcase per case,
+  the failure from the result, evidence paths as `attachment` properties and
+  `[[ATTACHMENT|…]]` lines. With `--ci` it is always written, by default to
+  `.qa/runs/<run>/junit.xml`.
+- Every password the plan types must be in the environment (`env:NAME` secrets or
+  `QA_PASSWORD`); a missing one stops the job before a browser starts, naming the variable.
+- Without ffmpeg, recordings are skipped with a warning; screenshots and marks still replay.
+- `replay <runId> --ci` does the same for a run the viewer prepared.
+
+[`examples/ci/qa-replay.yml`](examples/ci/qa-replay.yml) is a GitHub Actions workflow that
+runs a plan, uploads `.qa/runs/` as an artifact and publishes the JUnit report as a check.
+
 `profile` shows where agents' tokens went (context size per turn, tool results by tool), from any
 transcripts, so you can measure a change against earlier runs.
 

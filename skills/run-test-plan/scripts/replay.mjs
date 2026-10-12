@@ -87,7 +87,7 @@ export function prepareSuiteRun(suiteId, { label } = {}) {
   return { runId, warnings };
 }
 
-function credentials(test) {
+export function credentials(test) {
   const user = test.account?.user ?? null;
   const ref = test.account?.secret || execution().accounts.find((a) => a.user === user)?.secret || null;
   const env = ref?.startsWith('env:') ? ref.slice(4) : 'QA_PASSWORD';
@@ -206,7 +206,7 @@ function blockAll(runId, tc, test, reason, blockedReason, startedAt) {
   });
 }
 
-async function replayCase(client, runId, tc, test, creds) {
+async function replayCase(client, runId, tc, test, creds, recordings) {
   const startedAt = new Date().toISOString();
   const outcome = new Map();
   let failure = null;
@@ -220,6 +220,11 @@ async function replayCase(client, runId, tc, test, creds) {
     }
     let done = 0;
     for (const action of step.actions) {
+      // Without ffmpeg (CI mode checks) a recording cannot be stitched: skip it, keep the rest.
+      if (action.kind === 'rec' && !recordings) {
+        done += 1;
+        continue;
+      }
       const { error } = await runAction(client, runId, tc.id, action, creds);
       if (action.kind === 'rec' && !error) recording = action.action === 'start';
       if (error) {
@@ -277,7 +282,7 @@ async function replayCase(client, runId, tc, test, creds) {
   });
 }
 
-async function replayGroup(runId, cases, { headed, slot, log }) {
+async function replayGroup(runId, cases, { headed, recordings, slot, log }) {
   let client;
   try {
     client = await new McpClient('npx', browserArgs(`replay-${slot}`, { headless: !headed }), { cwd: PROJECT_ROOT }).start();
@@ -314,7 +319,7 @@ async function replayGroup(runId, cases, { headed, slot, log }) {
         log(`${tc.id} blocked (setup failed)`);
         continue;
       }
-      const result = await replayCase(client, runId, tc, test, creds);
+      const result = await replayCase(client, runId, tc, test, creds, recordings);
       log(`${tc.id} ${result.status.toUpperCase()} — ${result.summary}`);
     }
   } finally {
@@ -324,7 +329,7 @@ async function replayGroup(runId, cases, { headed, slot, log }) {
 
 // Runs every case of a prepared run. Groups run one at a time unless the app allows one user in
 // several browsers at once (execution.sessions "shared"), then up to execution.maxParallel.
-export async function executeRun(runId, { headed = false, log = () => {} } = {}) {
+export async function executeRun(runId, { headed = false, recordings = true, log = () => {} } = {}) {
   const plan = readJson(join(runDir(runId), 'plan.json'));
   const groups = new Map();
   for (const tc of plan.testCases) {
@@ -340,7 +345,7 @@ export async function executeRun(runId, { headed = false, log = () => {} } = {})
   const limit = ex.sessions === 'shared' ? ex.maxParallel : 1;
   const queue = [...groups.values()];
   const workers = Array.from({ length: Math.min(limit, queue.length) }, async (_, i) => {
-    while (queue.length) await replayGroup(runId, queue.shift(), { headed, slot: i + 1, log });
+    while (queue.length) await replayGroup(runId, queue.shift(), { headed, recordings, slot: i + 1, log });
   });
   await Promise.all(workers);
   writeJson(join(runDir(runId), 'meta.json'), { ...readJson(join(runDir(runId), 'meta.json'), {}), finishedAt: new Date().toISOString() });

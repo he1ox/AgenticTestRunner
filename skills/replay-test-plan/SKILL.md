@@ -48,6 +48,12 @@ viewer server passes on its own environment, so start it (`$Q open`) from a shel
 `execution.replayTimeoutMs` (default 15000) is how long an action waits for its element and
 `execution.replayNavigationTimeoutMs` (default 60000) how long a page may take to load.
 
+In CI, add `--ci`: headless, no viewer, a line per case, a JUnit report (`--junit <path>`,
+default `.qa/runs/<run>/junit.xml`) and exit code 1 when a case ends in a `--fail-on` status
+(`fail,blocked` by default; `fail`, `blocked` or `none`), 2 when it cannot start (unknown
+plan, or a password variable missing: checked before any browser opens). No ffmpeg skips
+recordings only. Example workflow: `examples/ci/qa-replay.yml` in the qa-runner repository.
+
 Groups run one at a time unless `execution.sessions` is `shared`. A test recorded right after
 another case of the same agent session, with no separate login, may depend on it: the run warns
 when the plan leaves that case out.
