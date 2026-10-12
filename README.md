@@ -72,6 +72,12 @@ and press **Run**. Each script replays in its own headless browser with no agent
 shows up like any other, marked Deterministic, at $0. When a replay fails because the UI changed
 on purpose, **Repair with agent** re-records only that case.
 
+A Test plan can gate your pipeline. `suite run <id> --ci` replays headless, writes a JUnit
+report and exits 1 when a case fails, so a regression blocks the merge
+([Run in CI](#run-in-ci)). When your team would rather own the tests as code, `export` writes
+each script as a standard Playwright Test file that runs with `npx playwright test`
+([Export to Playwright](#export-to-playwright)).
+
 The agent runs are sized to stay cheap. `init` splits the plan into batches and gives each a tier
 and effort. In Claude Code, short read-only cases run on Haiku, cases that change data or need
 judgment run on Sonnet, and any failure Haiku reports is rerun on Sonnet before you see it. Each
@@ -87,8 +93,9 @@ when the harness reports no usage or the model has no price. Filter by date rang
 ## How it compares
 
 - **Playwright Test Agents** (planner, generator, healer) write and repair `.spec.ts` files.
-  Choose them if your team wants test code to own and maintain. qa-runner runs test cases and
-  gives you evidence to sign off on, and its scripts replay with qa-runner's own runner.
+  Choose them if your team wants test code to own and maintain. qa-runner starts earlier: it
+  runs the test cases from a ticket and gives you evidence to sign off on. The cases you approve
+  can then be exported as `.spec.ts` files, so the two work together.
 - **AI testing platforms** such as Momentic, QA Wolf and testRigor run your tests on their
   platform under a subscription. qa-runner runs on your machine with the agent and model you
   already pay for, and keeps plans, evidence and memory as files in your repository.
@@ -277,6 +284,54 @@ node skills/run-test-plan/scripts/qa-runs.mjs suite run release-1.0.1
 Scripts type the login password from the account's `env:NAME` secret or `QA_PASSWORD`, so start
 the viewer from a shell that has them. See the
 [`replay-test-plan`](skills/replay-test-plan/SKILL.md) skill.
+
+### Run in CI
+
+`--ci` turns a Test plan into a pipeline gate. It runs with no viewer window and no agent,
+prints a line per case and the totals, and exits 0 when everything passed, 1 when a case failed
+and 2 when the run could not start.
+
+```bash
+node skills/run-test-plan/scripts/qa-runs.mjs suite run smoke --ci --junit qa-junit.xml
+```
+
+- `--fail-on fail|blocked|fail,blocked|none` picks which statuses fail the job. The default is
+  `fail,blocked`, since a blocked case (no login, a removed script) proved nothing.
+- `--junit <path>` writes a JUnit report: one testsuite for the plan, one testcase per case,
+  the failure from the result, and evidence paths as `attachment` properties and
+  `[[ATTACHMENT|…]]` lines. With `--ci` it is always written, by default to
+  `.qa/runs/<run>/junit.xml`.
+- Every password the plan types must be in the environment (`env:NAME` secrets or
+  `QA_PASSWORD`). A missing one stops the job before a browser starts, and the error names the
+  variable.
+- Without ffmpeg, recordings are skipped with a warning. Screenshots and marks still replay.
+- `replay <runId> --ci` does the same for a run the viewer prepared.
+
+[`examples/ci/qa-replay.yml`](examples/ci/qa-replay.yml) is a GitHub Actions workflow that
+runs a plan, uploads `.qa/runs/` as an artifact and publishes the JUnit report as a check.
+
+### Export to Playwright
+
+The library is plain JSON. When your team wants to run, review and own the tests as code,
+`export` writes them as standard [Playwright Test](https://playwright.dev/docs/intro) files:
+
+```bash
+node skills/run-test-plan/scripts/qa-runs.mjs export --tag smoke --out e2e/qa --config
+npx playwright test --grep @smoke
+```
+
+Each script becomes `e2e/qa/<plan>/<tc>.spec.ts`, and a plan group that shares one browser
+session becomes one serial file. The login turns into a `beforeEach` that reads the password
+from `process.env`, so it is never written to the file. Each plan step becomes a `test.step`,
+the recorded Playwright code is kept as it is, and every screenshot mark becomes a
+`toBeVisible()` assertion with the screenshot attached to the report. Anything that can't be
+translated is left as a `// TODO(qa-runner)` comment.
+
+Select tests by id, `--tag`, `--suite` or `--plan`. The same scripts always produce the same
+files, and a file you edited is only replaced with `--force`. `--config` adds a
+`playwright.config.ts` when the project has none. The viewer's **Tests** view has the same
+action for the tests its filters show. Your project needs `@playwright/test`; qa-runner itself
+still has no npm dependencies.
 
 ## Develop
 
