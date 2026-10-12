@@ -8,6 +8,13 @@ in a local viewer, and rerun only the cases a human rejects. They work in any co
 runs shell commands: Claude Code, Codex, Cursor, Gemini CLI, OpenCode, GitHub Copilot CLI and
 others.
 
+![Human in the loop: you approve the plan, orchestrate the Test Agents, answer their questions, review the evidence and approve what they learn. Each answer, script and rule you approve makes the system work more like you.](docs/human-in-the-loop.gif)
+
+You stay in the loop where judgment matters: you approve the cases, answer the agents when they
+are missing a value, accept or reject each result, and decide which lessons they keep. Everything
+you approve is reused by later runs, so you step in less each time and the agents work more the
+way you do.
+
 ```bash
 npx skills add he1ox/AgenticTestRunner
 ```
