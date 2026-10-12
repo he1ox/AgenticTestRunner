@@ -68,7 +68,7 @@ export function createLibrary({ host, api, icon, toast, onOpenRun }) {
     host.innerHTML = `
       <div class="dash-head">
         <div><h1>Tests</h1><p class="dash-muted">Every case a Test Agent passed is saved as a script that replays without an agent: same steps, same screenshots and marks, same recording. ${state.tests.length} in the library.</p></div>
-        <a class="btn" href="#/plans">${icon('file')}Test plans</a>
+        <div class="lib-actions"><button type="button" class="btn" data-export-tests ${list.length ? '' : 'disabled'} title="Write the tests shown as Playwright Test files (.spec.ts)">${icon('file')}Export to Playwright</button><a class="btn" href="#/plans">${icon('file')}Test plans</a></div>
       </div>
       ${filterBar('tests')}
       ${
@@ -167,6 +167,21 @@ export function createLibrary({ host, api, icon, toast, onOpenRun }) {
     try {
       const suite = await api('/api/suites', { method: 'POST', body: JSON.stringify({ name: data.get('name'), tags: data.get('tags'), tests: [] }) });
       location.hash = `#/plan/${encodeURIComponent(suite.id)}`;
+    } catch (error) {
+      toast(error.message, true);
+    }
+  }
+
+  // The tests the filters show → Playwright Test files (export-playwright.mjs); a file changed by
+  // hand is skipped, and the CLI's --force is the only way to replace it.
+  async function exportTests() {
+    const ids = state.tests.filter((t) => matches(t)).map((t) => t.id);
+    try {
+      const { lines, files } = await api('/api/tests/export', { method: 'POST', body: JSON.stringify({ ids }) });
+      const skipped = files.filter((f) => f.state === 'exists').length;
+      const folder = files[0] ? ` in ${files[0].file.split('/').slice(0, -2).join('/')}/` : '';
+      const why = skipped ? ' Skipped files were changed by hand; `qa-runs.mjs export --force` replaces them.' : '';
+      toast(`Playwright${folder}: ${lines.at(-2)}${why}`, skipped > 0);
     } catch (error) {
       toast(error.message, true);
     }
@@ -386,6 +401,7 @@ export function createLibrary({ host, api, icon, toast, onOpenRun }) {
     const data = target.dataset;
     if (data.editTags) return editTags(data.editTags);
     if (data.toggleStatus) return toggleStatus(data.toggleStatus);
+    if (data.exportTests !== undefined) return exportTests();
     if (data.runSuite) return runSuite(data.runSuite);
     if (data.openRun) return onOpenRun(data.openRun);
     if (data.save !== undefined) return saveDraft();

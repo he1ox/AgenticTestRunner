@@ -5,7 +5,7 @@ license: MIT
 compatibility: Part of qa-runner; needs the run-test-plan skill installed alongside. Node.js 20+ and npx (Playwright MCP); ffmpeg only for recordings.
 metadata:
   author: jorge.lopezg
-  version: "0.8.0"
+  version: "0.9.0"
 ---
 
 # Replay Test Plan
@@ -48,6 +48,12 @@ viewer server passes on its own environment, so start it (`$Q open`) from a shel
 `execution.replayTimeoutMs` (default 15000) is how long an action waits for its element and
 `execution.replayNavigationTimeoutMs` (default 60000) how long a page may take to load.
 
+In CI, add `--ci`: headless, no viewer, a line per case, a JUnit report (`--junit <path>`,
+default `.qa/runs/<run>/junit.xml`) and exit code 1 when a case ends in a `--fail-on` status
+(`fail,blocked` by default; `fail`, `blocked` or `none`), 2 when it cannot start (unknown
+plan, or a password variable missing: checked before any browser opens). No ffmpeg skips
+recordings only. Example workflow: `examples/ci/qa-replay.yml` in the qa-runner repository.
+
 Groups run one at a time unless `execution.sessions` is `shared`. A test recorded right after
 another case of the same agent session, with no separate login, may depend on it: the run warns
 when the plan leaves that case out.
@@ -59,6 +65,25 @@ regressed (review it like any failure) or the UI changed on purpose and the scri
 **Repair with agent** in the viewer (or `$Q heal <runId> <tcId>`) creates a one-case run briefed
 from the original steps and the failure. Execute it with the **run-test-plan** skill's normal loop (`next` → launch → `usage --batch`);
 when the agent passes, its script becomes the next version of the same test.
+
+## Export to Playwright
+
+When the team wants the tests as their own Playwright code (CI they already run, SDETs who
+review `.spec.ts`), export them; the library stays the source for qa-runner's own runs:
+
+```
+$Q export [<PLAN/TC>…] [--tag smoke] [--suite <id>] [--plan SHOP-42] [--out e2e/qa] [--force] [--config]
+```
+
+- One `<out>/<plan>/<tc>.spec.ts` per script; a plan group (one browser session) is one serial
+  file. No selector exports the whole library. Then `npx playwright test` (the project needs
+  `@playwright/test`).
+- Login → `beforeEach` with `process.env.<NAME>` for the account's `env:NAME` secret
+  (`QA_PASSWORD` otherwise); steps → `test.step`; recorded code as is, with URLs of the
+  target app behind `BASE_URL` (`QA_BASE_URL`); each mark → `expect(…).toBeVisible()`;
+  untranslatable actions and captures without marks → `// TODO(qa-runner)` comments.
+- Same scripts, same bytes. A file that differs (edited by hand) is skipped unless `--force`;
+  `--config` writes `playwright.config.ts` only if the project has no Playwright config.
 
 ## Limits
 

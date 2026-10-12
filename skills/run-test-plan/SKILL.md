@@ -5,7 +5,7 @@ license: MIT
 compatibility: Any agent that runs shell commands (Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Copilot CLI…). Needs Node.js 20+, npx for the Playwright MCP browser server, and ffmpeg only for recordings.
 metadata:
   author: jorge.lopezg
-  version: "0.8.0"
+  version: "0.9.0"
 ---
 
 # Run Test Plan

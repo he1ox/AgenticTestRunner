@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.9.0 — 2026-10-11
+
+From sign-off to pipeline: approved cases gate CI and export as Playwright code.
+
+- **CI mode for Test plans.** `suite run <id> --ci` (and `replay <runId> --ci`) replays
+  headless with no viewer window and no agent, prints one line per case and the totals, and
+  exits 1 when a case ends in a `--fail-on` status (`fail`, `blocked`, both by default, or
+  `none`), 2 when the run cannot start. Missing password variables are reported up front, by
+  name, before a browser starts; without ffmpeg, recordings are skipped with a warning. On
+  GitHub Actions each gating case is also an `::error` annotation. The logic lives in
+  `scripts/ci.mjs`.
+- **JUnit reports.** `--junit <path>` (always written with `--ci`, by default to
+  `.qa/runs/<run>/junit.xml`): one testsuite for the plan, one testcase per case, the failure
+  from the result, evidence as `attachment` properties and `[[ATTACHMENT|…]]` lines.
+- **Example workflow** `examples/ci/qa-replay.yml`: run a plan on GitHub Actions, upload the run
+  folder, publish the JUnit report as a check.
+- **Export to Playwright.** `qa-runs.mjs export [<PLAN/TC>…] [--tag t] [--suite id] [--plan P]
+  [--out e2e/qa] [--force] [--config]` writes library scripts as standard Playwright Test files
+  (`<out>/<plan>/<tc>.spec.ts`; a plan group is one serial file sharing a page) that run with
+  `npx playwright test`. The login becomes a `beforeEach` reading the password from
+  `process.env`, steps become `test.step`, recorded code is kept, target-app URLs go through
+  `BASE_URL` (`QA_BASE_URL`), and screenshot marks become `toBeVisible()` assertions with the
+  screenshot attached; anything else is a `// TODO(qa-runner)` comment. Output is
+  deterministic, edited files are kept unless `--force`, and `--config` adds a
+  `playwright.config.ts` only when none exists. The viewer's Tests view has an
+  **Export to Playwright** button for the filtered tests (`POST /api/tests/export`).
+- **README** rewritten around who signs off a release: evidence for every verdict, the four
+  decisions a human makes, approved cases replaying for free, and how qa-runner compares with
+  Playwright Test Agents, AI testing platforms and general browser agents.
+
 ## 0.8.0 — 2026-10-11
 
 Harness parity: what was Claude Code only now works with every agent.

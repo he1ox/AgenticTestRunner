@@ -3,21 +3,107 @@
 [![skills.sh](https://skills.sh/b/he1ox/AgenticTestRunner)](https://skills.sh/he1ox/AgenticTestRunner)
 [![ci](https://github.com/he1ox/AgenticTestRunner/actions/workflows/ci.yml/badge.svg)](https://github.com/he1ox/AgenticTestRunner/actions/workflows/ci.yml)
 
-Agent skills that run manual-style end-to-end test plans with browser agents, show the results
-in a local viewer, and rerun only the cases a human rejects. They work in any coding agent that
-runs shell commands: Claude Code, Codex, Cursor, Gemini CLI, OpenCode, GitHub Copilot CLI and
-others.
+**Your manual test cases, run by browser agents and signed off by you.**
 
-![Human in the loop: you approve the plan, orchestrate the Test Agents, answer their questions, review the evidence and approve what they learn. Each answer, script and rule you approve makes the system work more like you.](docs/human-in-the-loop.gif)
-
-You stay in the loop where judgment matters: you approve the cases, answer the agents when they
-are missing a value, accept or reject each result, and decide which lessons they keep. Everything
-you approve is reused by later runs, so you step in less each time and the agents work more the
-way you do.
+qa-runner is a set of agent skills for the coding agent you already use: Claude Code, Codex,
+Cursor, Gemini CLI, OpenCode, GitHub Copilot CLI and others. Give it a ticket. It drafts the test
+cases for your approval, runs each one in a real browser, and backs every verdict with marked
+screenshots and a recording. You approve or reject each result. Every case you approve is saved
+as a script that replays later without an agent, at $0 in tokens.
 
 ```bash
 npx skills add he1ox/AgenticTestRunner
 ```
+
+Then ask your agent to "run the test cases for SHOP-42".
+
+![Human in the loop: you approve the plan, orchestrate the Test Agents, answer their questions, review the evidence and approve what they learn. Each answer, script and rule you approve makes the system work more like you.](docs/human-in-the-loop.gif)
+
+## Built for the person who signs off the release
+
+You test a web app by working through the test cases in a ticket: log in, click through each
+step, compare what you see with the expected result, take screenshots, paste them into the
+ticket, and do it all again next release. qa-runner does the clicking and the screenshots, and
+leaves every verdict to you.
+
+It fits QA engineers and QA leads who run manual or exploratory test plans, and developers who
+verify their own feature before they hand it off. If your team writes and maintains a Playwright
+suite as code, read [how it compares](#how-it-compares) first.
+
+## Every verdict comes with proof
+
+For each expected result the Test Agent takes a screenshot and marks what it checked: boxes,
+arrows, numbered steps, text legends, blur for personal data, spotlight. With recording on, it
+records the tab while it tests and saves an MP4 with the dead air cut.
+
+The marks live in a JSON file next to the image, so the pixels stay untouched. In the viewer you
+add your own marks, switch them off to see the raw screenshot, or export a flattened PNG for the
+ticket. A replay redraws the same marks.
+
+Before anyone sees a verdict, `validate` checks the run against the result contract. It flags
+missing evidence, failures the agent didn't explain, missing recordings and credentials that
+leaked into the output.
+
+![Evidence: the Test Agent records the tab while it tests, measures elements from the DOM, takes a screenshot and marks it with a box, an arrow, numbered steps, a text legend, blur and spotlight; a reviewer adds a mark, toggles marks off to see the raw pixels and exports a PNG.](docs/evidence-and-marks.gif)
+
+## You step in where judgment matters
+
+Agents do the repetitive work. You make four decisions, and each one is reused by later runs:
+
+1. **Approve the plan.** `write-test-plan` turns the ticket into `.qa/plans/<KEY>.plan.json` and
+   shows you the case list before anything runs.
+2. **Answer questions.** When an agent needs a value it doesn't have, such as an approver account
+   or a coupon code, it asks in the viewer and waits. Tick "Remember" and later runs in the same
+   situation reuse your answer.
+3. **Review each result.** Approve, Needs retest or Reject, with a per-case chat to ask the agent
+   what it saw. A retest reruns only the cases you rejected.
+4. **Approve what agents learn.** After a run, agents propose lessons about your app. Nothing is
+   reused until you approve it, and secrets are stored only as `env:NAME` references.
+
+Commit `.qa/memory/` and your team shares what the agents learned. The more you approve, the
+less often they need to ask.
+
+## Agents run a case once, and your approvals replay for free
+
+Every case an agent passes is saved as a script, read from the browser server's call log at no
+extra cost: the same steps, the same annotated screenshots, the same recording. In the viewer's
+**Tests** view you group scripts into Test plans ("Release 1.0.1", tags `smoke`, `regression`)
+and press **Run**. Each script replays in its own headless browser with no agent, and the run
+shows up like any other, marked Deterministic, at $0. When a replay fails because the UI changed
+on purpose, **Repair with agent** re-records only that case.
+
+A Test plan can gate your pipeline. `suite run <id> --ci` replays headless, writes a JUnit
+report and exits 1 when a case fails, so a regression blocks the merge
+([Run in CI](#run-in-ci)). When your team would rather own the tests as code, `export` writes
+each script as a standard Playwright Test file that runs with `npx playwright test`
+([Export to Playwright](#export-to-playwright)).
+
+The agent runs are sized to stay cheap. `init` splits the plan into batches and gives each a tier
+and effort. In Claude Code, short read-only cases run on Haiku, cases that change data or need
+judgment run on Sonnet, and any failure Haiku reports is rerun on Sonnet before you see it. Each
+case's brief is about 1.5 KB, and the Test Agent's prompt holds only the testing rules. With the
+Claude Code plugin, up to three batches run at once, each in its own isolated browser, with one
+account each when your app allows only one session per user.
+
+The viewer opens on a dashboard of how your agents are doing: pass rate, failures, blocked cases,
+agent time per case (excluding time spent waiting on you), reviewer agreement, questions asked,
+and cost per run. Cost is the API list-price equivalent, exact from agent transcripts, and "n/a"
+when the harness reports no usage or the model has no price. Filter by date range and plan.
+
+## How it compares
+
+- **Playwright Test Agents** (planner, generator, healer) write and repair `.spec.ts` files.
+  Choose them if your team wants test code to own and maintain. qa-runner starts earlier: it
+  runs the test cases from a ticket and gives you evidence to sign off on. The cases you approve
+  can then be exported as `.spec.ts` files, so the two work together.
+- **AI testing platforms** such as Momentic, QA Wolf and testRigor run your tests on their
+  platform under a subscription. qa-runner runs on your machine with the agent and model you
+  already pay for, and keeps plans, evidence and memory as files in your repository.
+- **General browser agents** such as browser-use or gstack's `/qa` explore an app and report what
+  they found. qa-runner adds what a sign-off needs: an approved plan, an evidence check before any
+  verdict, review per case and a retest of what you reject.
+
+## How a run works
 
 ```
 plan.json ──init──▶ brief.md per case ──Test Agent (browser)──▶ result.json + evidence/
@@ -25,46 +111,14 @@ plan.json ──init──▶ brief.md per case ──Test Agent (browser)──
    └──── retest ◀── review.json ◀── viewer (human review) ◀── validate
 ```
 
-- **Plans as data.** Test cases, steps, variants and guardrails live in a JSON plan.
-- **Any agent.** The orchestration is a zero-dependency Node CLI; your agent only launches what
-  it prints. Test Agents start as your agent's own subagents, or run inline when it has none.
-- **Small Test Agents.** Their prompt holds only the testing rules, and every case's brief is
-  about 1.5 KB.
-- **Right-sized.** `init` splits the plan into batches and gives each a tier and effort. In
-  Claude Code short read-only cases go to Haiku, cases that change data or need judgment to
-  Sonnet, and any failure Haiku reports is re-run on Sonnet before you see it. With the Claude
-  Code plugin, up to three batches run at once, each in its own isolated browser, with one
-  account each when your app allows only one session per user.
-- **Contract checks.** `validate` flags missing evidence, unexplained failures, missing
-  recordings and leaked credentials before anyone trusts a verdict.
-- **Dashboard.** The viewer opens on how your agents are doing: pass rate, failures, blocked
-  cases, average agent time per case (excluding time waiting on you), reviewer agreement and
-  questions asked, plus cost per run (API list-price equivalent, exact from agent
-  transcripts; "n/a" when the harness reports no usage or the model has no price), with outcomes by run and by variant, cases that need attention, the slowest
-  cases, and your recent runs. Filter by date range and plan.
-- **Local viewer.** Live progress, screenshots with non-destructive marks (arrows, boxes,
-  spotlight, blur), recordings, a per-case agent chat, and Approve / Needs retest / Reject.
-- **Reference comparison.** Optionally compare each case against another app (legacy,
-  production, a design) and report deviations.
-- **Test library and Test plans.** Every case an agent passes is saved as a script, read from
-  the browser server's own call log (or the agent's transcript in Claude Code) at no extra cost,
-  with any agent: same steps, same annotated screenshots, same recording. In the viewer you group scripts into Test plans ("Release 1.0.1", tags `smoke`,
-  `regression`…) and run them deterministically: no agent, no tokens. When a replay fails because
-  the UI changed on purpose, "Repair with agent" re-records just that case.
-- **Memory.** When an agent needs a value it does not have, it asks you in the viewer and waits.
-  Tick "Remember" and later runs in the same situation reuse the answer. Agents also propose
-  what they learned; nothing is reused until you approve it. Secrets are stored only as
-  `env:NAME` references.
+The orchestration is a Node CLI with no npm dependencies. Your agent launches what it prints:
+Test Agents start as your agent's own subagents, or run inline when it has none. The browser is
+[Playwright MCP](https://github.com/microsoft/playwright-mcp) at a pinned version with an
+isolated profile.
 
-![Evidence: the Test Agent records the tab while it tests, measures elements from the DOM, takes a screenshot and marks it with a box, an arrow, numbered steps, a text legend, blur and spotlight; a reviewer adds a mark, toggles marks off to see the raw pixels and exports a PNG.](docs/evidence-and-marks.gif)
-
-Every verdict comes with proof. With recording on, the agent records the tab while it tests, and
-the video is saved as an MP4 with the dead air cut. For each expected result it takes a screenshot
-and marks it: boxes, arrows, numbered steps, text legends, blur for personal data, spotlight. The
-marks live in a JSON file next to the image, never in its pixels, so you can add your own in the
-viewer, switch them off, or export a flattened PNG, and a replay redraws the same marks.
-
-## Skills
+Plans are data. Test cases, steps, variants and guardrails live in a JSON plan you can review in
+a pull request. Optionally, each case is compared against a second app (legacy, production, a
+design) and the deviations are reported.
 
 | Skill | Use it to |
 |---|---|
@@ -79,8 +133,7 @@ Install all four: the last three call the CLI that lives in `run-test-plan`.
 
 - An agent that runs shell commands and MCP tools
 - Node.js 20+ (no npm dependencies); installing with `npx skills add` needs Node.js 22.20+ for the installer itself
-- `npx` on the PATH: the browser is [Playwright MCP](https://github.com/microsoft/playwright-mcp)
-  (pinned version, isolated profile)
+- `npx` on the PATH, for the browser ([Playwright MCP](https://github.com/microsoft/playwright-mcp))
 - `ffmpeg` on the PATH, only for recordings
 
 ## Install
@@ -125,11 +178,6 @@ Per-agent details: [`references/harness/`](skills/run-test-plan/references/harne
 
 ### Claude Code plugin, step by step
 
-This fork ([he1ox/AgenticTestRunner](https://github.com/he1ox/AgenticTestRunner)) is its own
-plugin marketplace, named `AgenticTestRunner`; the plugin is `qa-runner`. If you installed the
-upstream plugin from the `jorgeebits/qa-runner` marketplace, uninstall it first with
-`claude plugin uninstall qa-runner@qa-runner`: both register the same agents and browser tools.
-
 ```bash
 claude plugin marketplace add he1ox/AgenticTestRunner
 ```
@@ -143,6 +191,11 @@ Restart Claude Code so the skills load. `claude plugin list` should show
 session has started. Call a skill directly with `/qa-runner:run-test-plan`. To update:
 `claude plugin marketplace update AgenticTestRunner`, then
 `claude plugin update qa-runner@AgenticTestRunner`.
+
+This repository ([he1ox/AgenticTestRunner](https://github.com/he1ox/AgenticTestRunner)) is its
+own plugin marketplace, named `AgenticTestRunner`; the plugin is `qa-runner`. If you installed the
+upstream plugin from the `jorgeebits/qa-runner` marketplace, uninstall it first with
+`claude plugin uninstall qa-runner@qa-runner`: both register the same agents and browser tools.
 
 Optional, for recordings: install `ffmpeg` (`winget install Gyan.FFmpeg`, `brew install ffmpeg`
 or `sudo apt install ffmpeg`).
@@ -177,8 +230,9 @@ at a time. Use `"shared"` when one user may be logged in from several browsers. 
 `maxCasesPerAgent`, `maxParallel` and `escalate` tune the routing; see
 `skills/run-test-plan/schemas/config.schema.json`. Passwords stay in environment variables.
 
-Add `.qa/runs/` to `.gitignore`; commit `.qa/memory/` to share what agents learned with your
-team, and `.qa/tests/` and `.qa/suites/` (the test library and Test plans). `examples/` holds a complete config, plan and memory.
+Add `.qa/runs/` to `.gitignore`. Commit `.qa/memory/` to share what agents learned with your
+team, and `.qa/tests/` and `.qa/suites/` (the test library and Test plans). `examples/` holds a
+complete config, plan and memory.
 
 ## Use
 
@@ -198,6 +252,9 @@ node skills/run-test-plan/scripts/qa-runs.mjs profile ~/.claude/projects/<projec
 node skills/run-test-plan/scripts/qa-runs.mjs memory --help
 ```
 
+`profile` shows where agents' tokens went (context size per turn, tool results by tool), from any
+transcripts, so you can measure a change against earlier runs.
+
 | Variable | Default | Purpose |
 |---|---|---|
 | `QA_PROJECT_DIR` | current directory | Project whose `.qa/` folder is used |
@@ -214,13 +271,9 @@ node skills/run-test-plan/scripts/qa-runs.mjs memory --help
 | `QA_PASSWORD` | none | Password deterministic replays type when the account has no `secret` |
 | `QA_REPLAY_DEBUG` | off | Print every action a deterministic replay sends and the browser's reply |
 
-### Test plans: deterministic runs
+### Test plans from the terminal
 
-Once agents have passed some cases, open the viewer's **Tests** view to see the library (tags,
-draft or verified, last replay) and **Test plans** to create one: name it, add your tags, pick
-tests (or every test with a tag) and press **Run**. The run replays each script in its own
-headless browser and shows up like any other run, marked Deterministic, at $0. The same from the
-terminal:
+Everything the **Tests** and **Test plans** views do is also a command:
 
 ```bash
 node skills/run-test-plan/scripts/qa-runs.mjs tests --tag smoke
@@ -232,8 +285,53 @@ Scripts type the login password from the account's `env:NAME` secret or `QA_PASS
 the viewer from a shell that has them. See the
 [`replay-test-plan`](skills/replay-test-plan/SKILL.md) skill.
 
-`profile` shows where agents' tokens went (context size per turn, tool results by tool), from any
-transcripts, so you can measure a change against earlier runs.
+### Run in CI
+
+`--ci` turns a Test plan into a pipeline gate. It runs with no viewer window and no agent,
+prints a line per case and the totals, and exits 0 when everything passed, 1 when a case failed
+and 2 when the run could not start.
+
+```bash
+node skills/run-test-plan/scripts/qa-runs.mjs suite run smoke --ci --junit qa-junit.xml
+```
+
+- `--fail-on fail|blocked|fail,blocked|none` picks which statuses fail the job. The default is
+  `fail,blocked`, since a blocked case (no login, a removed script) proved nothing.
+- `--junit <path>` writes a JUnit report: one testsuite for the plan, one testcase per case,
+  the failure from the result, and evidence paths as `attachment` properties and
+  `[[ATTACHMENT|…]]` lines. With `--ci` it is always written, by default to
+  `.qa/runs/<run>/junit.xml`.
+- Every password the plan types must be in the environment (`env:NAME` secrets or
+  `QA_PASSWORD`). A missing one stops the job before a browser starts, and the error names the
+  variable.
+- Without ffmpeg, recordings are skipped with a warning. Screenshots and marks still replay.
+- `replay <runId> --ci` does the same for a run the viewer prepared.
+
+[`examples/ci/qa-replay.yml`](examples/ci/qa-replay.yml) is a GitHub Actions workflow that
+runs a plan, uploads `.qa/runs/` as an artifact and publishes the JUnit report as a check.
+
+### Export to Playwright
+
+The library is plain JSON. When your team wants to run, review and own the tests as code,
+`export` writes them as standard [Playwright Test](https://playwright.dev/docs/intro) files:
+
+```bash
+node skills/run-test-plan/scripts/qa-runs.mjs export --tag smoke --out e2e/qa --config
+npx playwright test --grep @smoke
+```
+
+Each script becomes `e2e/qa/<plan>/<tc>.spec.ts`, and a plan group that shares one browser
+session becomes one serial file. The login turns into a `beforeEach` that reads the password
+from `process.env`, so it is never written to the file. Each plan step becomes a `test.step`,
+the recorded Playwright code is kept as it is, and every screenshot mark becomes a
+`toBeVisible()` assertion with the screenshot attached to the report. Anything that can't be
+translated is left as a `// TODO(qa-runner)` comment.
+
+Select tests by id, `--tag`, `--suite` or `--plan`. The same scripts always produce the same
+files, and a file you edited is only replaced with `--force`. `--config` adds a
+`playwright.config.ts` when the project has none. The viewer's **Tests** view has the same
+action for the tests its filters show. Your project needs `@playwright/test`; qa-runner itself
+still has no npm dependencies.
 
 ## Develop
 
@@ -247,7 +345,3 @@ See [AGENTS.md](AGENTS.md). In short: the Test Agents' rules live in
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md).
-
-## License
-
-[MIT](LICENSE)

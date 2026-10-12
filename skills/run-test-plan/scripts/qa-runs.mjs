@@ -43,10 +43,18 @@
 //   suite list | show <id> | create <name> [--tags a,b] [--tests ids] [--tag t]
 //         | add|remove <id> <testIds…> [--tag t] | delete <id>
 //                             Test plans (suites): a name, tags and library tests.
-//   suite run <id> [--headed] [--label txt]
+//   suite run <id> [--headed] [--label txt] [--ci] [--fail-on fail|blocked|fail,blocked|none]
+//         [--junit <path>]
 //                             Replay every test of a suite without an agent (no tokens).
-//   replay <runId>            Execute a run the viewer prepared (spawned by the server).
+//                             --ci: no viewer, per-case summary, JUnit at <run>/junit.xml
+//                             (or --junit), exit 1 when a case ends in a --fail-on status
+//                             (default fail,blocked), 2 when the run cannot start.
+//   replay <runId> [--ci …]   Execute a run the viewer prepared (spawned by the server).
 //   heal <runId> <tcId>       New agent run of one failed replay case; its script replaces the old.
+//   export [<PLAN/TC>…] [--tag t] [--suite id] [--plan P] [--out e2e/qa] [--force] [--config]
+//                             Write the scripts as Playwright Test files (.spec.ts), one per
+//                             script (one per plan group); no selector = the whole library.
+//                             --config adds a playwright.config.ts if the project has none.
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -73,6 +81,8 @@ import { doctor as runDoctor } from './doctor.mjs';
 import { resolveHarness } from './harness.mjs';
 import { buildSchedule, escalate, execution, finishBatch, nextLaunch, readSchedule, saveSchedule } from './schedule.mjs';
 import { executeRun, prepareSuiteRun } from './replay.mjs';
+import { runCi, writeJunit } from './ci.mjs';
+import { exportPlaywright } from './export-playwright.mjs';
 import { browserProfile, mergeProfiles, parseTranscript, recordUsage, runCost } from './usage.mjs';
 import {
   captureCode,
@@ -949,6 +959,7 @@ async function suite() {
       deleteSuite(id);
       console.log(`OK ${id} deleted`);
     } else if (action === 'run') {
+      if (flags.ci) process.exit(await runCi({ suite: id ?? (typeof flags.ci === 'string' ? flags.ci : undefined), label: flags.label, headed: Boolean(flags.headed), failOn: flags['fail-on'], junit: flags.junit }));
       if (!(await ensureServer())) fail(`viewer server did not start on port ${PORT}; captures and recordings need it.`);
       const { runId, warnings } = prepareSuiteRun(id, { label: flags.label });
       console.log(`OK run=${runId}`);
@@ -957,9 +968,10 @@ async function suite() {
       await executeRun(runId, { headed: Boolean(flags.headed), log: (line) => console.log(line) });
       const run = loadRun(runId);
       printStatus(run, countStatuses(run), true);
+      if (flags.junit) console.log(`junit=${repoPath(writeJunit(runId, flags.junit === true ? join(runDir(runId), 'junit.xml') : flags.junit))}`);
     } else
       fail(
-        'usage: suite [list | show <id> | create <name> [--tags a,b] [--tests ids] [--tag t] | add|remove <id> <testIds…> [--tag t] | delete <id> | run <id> [--headed] [--label txt]]',
+        'usage: suite [list | show <id> | create <name> [--tags a,b] [--tests ids] [--tag t] | add|remove <id> <testIds…> [--tag t] | delete <id> | run <id> [--headed] [--label txt] [--ci] [--fail-on fail|blocked|none] [--junit path]]',
       );
   } catch (error) {
     fail(error.message);
@@ -970,6 +982,7 @@ async function suite() {
 async function replay() {
   const runId = args[0];
   if (!runId || !existsSync(runDir(runId))) fail('usage: replay <runId>');
+  if (flags.ci) process.exit(await runCi({ runId, headed: Boolean(flags.headed), failOn: flags['fail-on'], junit: flags.junit }));
   await ensureServer();
   await executeRun(runId, { headed: Boolean(flags.headed), log: (line) => console.log(line) });
 }
@@ -1000,6 +1013,26 @@ async function heal() {
   console.log(`NEXT in your agent: "run-test-plan: execute run ${healId}, already initialized (references/execute.md, from \`next\`)"`);
 }
 
+// Library scripts → Playwright Test files (export-playwright.mjs). A bare flag swallows the
+// argument after it (`--force SHOP-42/TC-1`), so hand that back as a test id.
+function exportSpecs() {
+  for (const key of ['force', 'config']) if (typeof flags[key] === 'string') args.push(flags[key]);
+  try {
+    const { lines } = exportPlaywright({
+      ids: args,
+      tag: flags.tag,
+      suite: flags.suite,
+      plan: flags.plan,
+      ...(typeof flags.out === 'string' && { out: flags.out }),
+      force: Boolean(flags.force),
+      config: Boolean(flags.config),
+    });
+    for (const line of lines) console.log(line);
+  } catch (error) {
+    fail(error.message);
+  }
+}
+
 async function doctor() {
   const checks = await runDoctor({ harness: flags.harness, browser: Boolean(flags.browser) });
   for (const { ok, label, fix } of checks) {
@@ -1010,7 +1043,7 @@ async function doctor() {
 }
 
 // Dispatch last, so every function and constant above is initialized before a command runs.
-const commands = { init: () => init(), doctor, open, serve, mark, next, validate, status, latest, annotate, ask, answer, questions, memory, usage, profile, tests, suite, replay, heal };
+const commands = { init: () => init(), doctor, open, serve, mark, next, validate, status, latest, annotate, ask, answer, questions, memory, usage, profile, tests, suite, replay, heal, export: exportSpecs };
 if (!commands[command]) {
   console.log(
     readFileSync(new URL(import.meta.url), 'utf8')
