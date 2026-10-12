@@ -56,6 +56,14 @@ plan.json ──init──▶ brief.md per case ──Test Agent (browser)──
   what they learned; nothing is reused until you approve it. Secrets are stored only as
   `env:NAME` references.
 
+![Evidence: the Test Agent records the tab while it tests, measures elements from the DOM, takes a screenshot and marks it with a box, an arrow, numbered steps, a text legend, blur and spotlight; a reviewer adds a mark, toggles marks off to see the raw pixels and exports a PNG.](docs/evidence-and-marks.gif)
+
+Every verdict comes with proof. With recording on, the agent records the tab while it tests, and
+the video is saved as an MP4 with the dead air cut. For each expected result it takes a screenshot
+and marks it: boxes, arrows, numbered steps, text legends, blur for personal data, spotlight. The
+marks live in a JSON file next to the image, never in its pixels, so you can add your own in the
+viewer, switch them off, or export a flattened PNG, and a replay redraws the same marks.
+
 ## Skills
 
 | Skill | Use it to |
