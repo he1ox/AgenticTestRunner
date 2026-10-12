@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **CI mode for Test plans.** `suite run <id> --ci` (and `replay <runId> --ci`) replays
+  headless with no viewer window and no agent, prints one line per case and the totals, and
+  exits 1 when a case ends in a `--fail-on` status (`fail`, `blocked`, both by default, or
+  `none`), 2 when the run cannot start. Missing password variables are reported up front, by
+  name, before a browser starts; without ffmpeg, recordings are skipped with a warning. On
+  GitHub Actions each gating case is also an `::error` annotation. The logic lives in
+  `scripts/ci.mjs`.
+- **JUnit reports.** `--junit <path>` (always written with `--ci`, by default to
+  `.qa/runs/<run>/junit.xml`): one testsuite for the plan, one testcase per case, the failure
+  from the result, evidence as `attachment` properties and `[[ATTACHMENT|…]]` lines.
+- **Example workflow** `examples/ci/qa-replay.yml`: run a plan on GitHub Actions, upload the run
+  folder, publish the JUnit report as a check.
+
 ## 0.8.0 — 2026-10-11
 
 Harness parity: what was Claude Code only now works with every agent.
