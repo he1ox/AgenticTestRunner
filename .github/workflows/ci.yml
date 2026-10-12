@@ -37,8 +37,14 @@ jobs:
             $Q next "$run" | grep -q '^LAUNCH ' || { echo "next printed no LAUNCH for $h"; exit 1; }
           done
 
+      # The skills CLI itself needs Node 22.20+; the checks above stay on Node 20, our minimum.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: npx skills finds every skill
         run: |
+          set -o pipefail
           npx -y skills@1.7.2 add ./ --list | sed 's/\x1b\[[0-9;]*m//g' > skills.txt
           for s in run-test-plan write-test-plan qa-setup replay-test-plan; do
             grep -q "$s" skills.txt || { echo "npx skills did not list $s"; cat skills.txt; exit 1; }

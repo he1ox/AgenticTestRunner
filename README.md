@@ -63,7 +63,7 @@ Install all four: the last three call the CLI that lives in `run-test-plan`.
 ## Requirements
 
 - An agent that runs shell commands and MCP tools
-- Node.js 20+ (no npm dependencies)
+- Node.js 20+ (no npm dependencies); installing with `npx skills add` needs Node.js 22.20+ for the installer itself
 - `npx` on the PATH: the browser is [Playwright MCP](https://github.com/microsoft/playwright-mcp)
   (pinned version, isolated profile)
 - `ffmpeg` on the PATH, only for recordings
