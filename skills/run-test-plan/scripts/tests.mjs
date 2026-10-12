@@ -1,21 +1,26 @@
 // The test library. Every case a Test Agent passes becomes a script that replays without an agent:
 // Playwright MCP answers each browser tool with the Playwright code it ran ("### Ran Playwright
-// code"), so the script is read from the agent's transcript when the orchestrator records the
-// batch (`usage --batch --transcript`), at no cost to the agent's context. Captures and recordings
+// code"), so the script is read back when the orchestrator records the batch (`usage --batch`), at
+// no cost to the agent's context: from the agent's transcript when the harness keeps one in Claude
+// Code's format (`--transcript`), otherwise from the call log the browser proxy (browser-mcp.mjs)
+// writes, cut to the batch's time window. Captures and recordings
 // are kept as what they are (file, marks, start/stop), so a replay takes the same screenshots, with
 // the same marks, at the same moments.
 //
 // Scripts live in .qa/tests/<planId>/<tcId>.json (versioned with the project, reviewed in pull
 // requests); the previous version moves to .history/. Suites (the viewer's "Test plans") live in
 // .qa/suites/<id>.json and list scripts by id ("SHOP-42/TC-1").
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
+import { browserLog } from './agents.mjs';
 import { ranCode } from './mcp-client.mjs';
 import { transcriptEvents } from './usage.mjs';
 import { PORT, PROJECT_ROOT, SUITES_DIR, TESTS_DIR, displayPath, readJson, safeJoin, tcDir, writeJson } from './lib.mjs';
 
 export const TEST_STATUSES = ['draft', 'verified'];
-const BROWSER_TOOL = /^mcp__(?:plugin_qa-runner_qa-browser-\d+|playwright)__(browser_\w+)$/;
+// Each harness names MCP tools its own way (mcp__playwright__browser_click, qa-browser__browser_click,
+// qa-browser.browser_click, or the bare name); the Playwright tool is the part from `browser_`.
+export const BROWSER_TOOL = /(?:^|[^A-Za-z0-9])(browser_[a-z_]+)$/;
 const MARK_RUNNING = /\bmark\s+["']?([A-Za-z0-9._-]+)["']?\s+["']?([A-Za-z0-9._-]+)["']?\s+running\b/;
 const LOGIN = /Login: user (.+?), password ([\s\S]+?)\. Never write the password/;
 const PASSWORD_FILL =
@@ -214,7 +219,7 @@ function snippetSource(filename) {
 function toAction(tool, call) {
   if (tool === 'browser_close') return null;
   if (tool === 'browser_run_code_unsafe') {
-    const source = call.input.filename ? snippetSource(call.input.filename) : String(call.input.code || '');
+    const source = call.input.filename ? (call.source ?? snippetSource(call.input.filename)) : String(call.input.code || '');
     if (source.includes('Page.startScreencast')) return { kind: 'rec', action: 'start' };
     if (source.includes('Page.stopScreencast')) return { kind: 'rec', action: 'stop' };
     if (source.includes('/annotations/') && /const marks\s*=/.test(source)) {
@@ -279,6 +284,83 @@ export function extractActions(transcript, runId) {
   }
   if (!cases.size) setup.push(...loose.splice(0));
   return { login: parseLogin(prompt), setup, cases };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Browser call log → actions (any harness)
+
+// The calls browser-mcp.mjs logged for one slot between two instants, oldest first.
+export function browserCalls(slot, from, to = Date.now()) {
+  const calls = [];
+  for (const file of [browserLog(slot).replace(/\.jsonl$/, '.1.jsonl'), browserLog(slot)]) {
+    if (!existsSync(file)) continue;
+    for (const entry of transcriptEvents(file)) {
+      const at = Date.parse(entry.at || '');
+      if (at >= from && at <= to) calls.push({ at, name: entry.tool, input: entry.args || {}, source: entry.source, text: entry.text || '', isError: Boolean(entry.isError), done: true });
+    }
+  }
+  return calls.sort((a, b) => a.at - b.at);
+}
+
+// The browser server a batch's agent used: the plugin's agents each own a pool slot, everyone
+// else shares one server.
+export const batchSlot = (batch) => (/test-agent-\d+$/.test(String(batch?.agent || '')) && batch.slot ? String(batch.slot) : 'shared');
+
+const PASSWORD_FIELD = /password|contrase|passwd|pwd|clave|\bpin\b/i;
+
+// Without the agent's prompt the login comes from the batch's account, and the password from
+// what was typed into a password field (redacted the same way the transcript path redacts it).
+function loginFrom(batch, run, calls) {
+  const secret = batch?.account?.secret;
+  let password = secret?.startsWith('env:') ? process.env[secret.slice(4)] || null : null;
+  for (const call of calls) {
+    if (password) break;
+    const tool = BROWSER_TOOL.exec(call.name)?.[1];
+    if (tool === 'browser_type' && PASSWORD_FIELD.test(String(call.input.element || call.input.target || call.input.ref || ''))) password = call.input.text || null;
+    if (tool === 'browser_fill_form')
+      for (const field of call.input.fields || []) if (PASSWORD_FIELD.test(String(field.name || field.element || field.target || ''))) password = field.value || password;
+  }
+  const user = batch?.account?.user || run.plan.environment?.user || null;
+  return user || password ? { user, password: password ? String(password) : null } : null;
+}
+
+// What the agent did in one batch, from the proxy's log: the same { login, setup, cases } that
+// extractActions reads from a transcript. Cases are cut by their `mark … running` time
+// (timing.json) and closed by their result.json; calls between a result and the next case's mark
+// belong to that next case, and calls before the first mark are the setup.
+export function extractFromBrowserLog(run, batchCases, batch) {
+  const from = Date.parse(batch?.startedAt || '') || 0;
+  if (!from) throw new Error('the batch has no start time');
+  const calls = browserCalls(batchSlot(batch), from);
+  const startOf = (id) => (id ? Date.parse(readJson(join(tcDir(run.id, id), 'timing.json'), {})?.startedAt || '') || null : null);
+  const endOf = (id) => {
+    const file = join(tcDir(run.id, id), 'result.json');
+    return existsSync(file) ? statSync(file).mtimeMs : null;
+  };
+  const bounds = batchCases.map((id, i) => ({ id, start: startOf(id), end: endOf(id), next: startOf(batchCases[i + 1]) }));
+  const setup = [];
+  const cases = new Map(batchCases.map((id) => [id, []]));
+  const setupUntil = bounds[0]?.start ?? from;
+  let previousEnd = setupUntil;
+  const windows = bounds.map((b) => {
+    // A result.json rewritten after the next case started does not move the boundary.
+    const end = Math.min(b.end ?? Infinity, b.next ?? Infinity);
+    const window = { id: b.id, after: previousEnd, until: end };
+    previousEnd = end;
+    return window;
+  });
+  for (const call of calls) {
+    const tool = BROWSER_TOOL.exec(call.name)?.[1];
+    if (!tool || call.isError) continue;
+    const action = toAction(tool, call);
+    if (!action) continue;
+    if (call.at < setupUntil) setup.push(action);
+    else {
+      const window = windows.find((w) => call.at >= w.after && call.at <= w.until);
+      if (window) cases.get(window.id).push(action);
+    }
+  }
+  return { login: loginFrom(batch, run, calls), setup, cases, calls };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -463,14 +545,30 @@ function buildScript(run, tc, actions, { setup, login, batch, predecessors }) {
 
 // Called right after a batch's usage is recorded. Returns one line per case for the orchestrator.
 export function extractScripts(run, batchCases, transcript, batch = null) {
-  const lines = [];
   let extracted;
   try {
     extracted = extractActions(transcript, run.id);
   } catch (error) {
     return [`script: transcript not readable (${error.message})`];
   }
-  const { setup, cases, login } = extracted;
+  return saveExtracted(run, batchCases, extracted, batch, 'the transcript');
+}
+
+// The same, from the browser proxy's call log: for every harness that keeps no Claude transcript.
+export function extractScriptsFromLog(run, batchCases, batch) {
+  let extracted;
+  try {
+    extracted = extractFromBrowserLog(run, batchCases, batch);
+  } catch (error) {
+    return [`script: browser log not readable (${error.message})`];
+  }
+  if (!extracted.calls.length)
+    return [`script: no browser calls logged for batch ${batch?.id} (is the browser server browser-mcp.mjs, see $Q doctor?)`];
+  return saveExtracted(run, batchCases, extracted, batch, 'the browser log');
+}
+
+function saveExtracted(run, batchCases, { setup, cases, login }, batch, from) {
+  const lines = [];
   batchCases.forEach((id, index) => {
     const tc = run.testCases.find((t) => t.id === id);
     if (!tc) return;
@@ -483,7 +581,7 @@ export function extractScripts(run, batchCases, transcript, batch = null) {
           : tool !== 'playwright-mcp'
             ? `not saved (tool ${tool})`
             : !cases.get(id)?.length
-              ? 'not saved (no browser actions found in the transcript)'
+              ? `not saved (no browser actions found in ${from})`
               : null;
     if (why) return lines.push(`script ${id}: ${why}`);
     const script = buildScript(run, tc, cases.get(id), {

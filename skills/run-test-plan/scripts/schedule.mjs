@@ -11,27 +11,29 @@
 //   its own account, so the account pool caps the parallelism too.
 // - Escalation: a case a cheaper model reports as failed, blocked or thin is re-run once by the
 //   standard tier before a human sees it, so a model's mistake never reaches review as a defect.
+// - Harness (harness.mjs): which models the tiers default to, and whether batches run on the
+//   Claude Code plugin's browser pool or one at a time on a shared browser.
 import { existsSync, mkdirSync, readdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
-import { FALLBACK_PREFIX, POOL_SIZE, agentBody, agentType } from './agents.mjs';
+import { FALLBACK_PREFIX, GENERIC_PREFIX, POOL_SIZE, agentBody, agentType } from './agents.mjs';
+import { defaultModel, hasPool } from './harness.mjs';
 import { CONFIG, displayPath, readJson, runDir, tcDir, writeJson } from './lib.mjs';
 
 export const TIERS = ['simple', 'standard', 'complex'];
-const DEFAULT_ROUTES = {
-  simple: { model: 'haiku', effort: 'medium' },
-  standard: { model: 'sonnet', effort: 'medium' },
-  complex: { model: 'sonnet', effort: 'high' },
-};
+const DEFAULT_EFFORT = { simple: 'medium', standard: 'medium', complex: 'high' };
 const ESCALATION = 'standard';
 
-export const execution = () => {
+export const execution = (harness = 'claude-code') => {
   const e = CONFIG.execution || {};
+  const pool = hasPool(harness);
   return {
-    maxParallel: Math.max(1, Math.min(Number(e.maxParallel) || POOL_SIZE, POOL_SIZE)),
+    maxParallel: pool ? Math.max(1, Math.min(Number(e.maxParallel) || POOL_SIZE, POOL_SIZE)) : 1,
     maxCasesPerAgent: Math.max(1, Number(e.maxCasesPerAgent) || 3),
     sessions: e.sessions === 'shared' ? 'shared' : 'exclusive',
     accounts: Array.isArray(e.accounts) ? e.accounts.filter((a) => a?.user) : [],
-    routes: Object.fromEntries(TIERS.map((t) => [t, { ...DEFAULT_ROUTES[t], ...(e.tiers?.[t] || {}) }])),
+    routes: Object.fromEntries(
+      TIERS.map((t) => [t, { model: defaultModel(harness, t), effort: DEFAULT_EFFORT[t], ...(e.tiers?.[t] || {}) }]),
+    ),
     escalate: e.escalate !== false,
   };
 };
@@ -81,8 +83,8 @@ function routeFor(tier, cases, plan, routes) {
 const rank = (tier) => TIERS.indexOf(tier);
 const sameVariants = (a = {}, b = {}) => Object.entries(a).every(([k, v]) => b[k] === undefined || b[k] === v);
 
-export function buildSchedule(plan, testCases, histories = new Map()) {
-  const ex = execution();
+export function buildSchedule(plan, testCases, histories = new Map(), harness = 'claude-code') {
+  const ex = execution(harness);
   const classified = new Map(testCases.map((tc) => [tc.id, classify(tc, plan, histories.get(tc.id))]));
   const groups = new Map();
   for (const tc of testCases) groups.set(tc.group || tc.id, [...(groups.get(tc.group || tc.id) || []), tc]);
@@ -101,12 +103,13 @@ export function buildSchedule(plan, testCases, histories = new Map()) {
         variants: chunk[0].variants || {},
         user: chunk[0].environment?.user || plan.environment?.user || null,
         serial: chunk.some((tc) => (tc.tags || []).includes('serial')),
-        pool: playwright,
+        pool: playwright && hasPool(harness),
         state: 'pending',
       });
     }
   return {
     createdAt: new Date().toISOString(),
+    harness,
     sessions: ex.sessions,
     maxParallel: ex.maxParallel,
     cases: Object.fromEntries([...classified].map(([id, c]) => [id, c])),
@@ -131,21 +134,25 @@ function passwordSlot(account) {
   return `user ${account.user}, password {{PASSWORD${account.secret ? ` ${account.secret}` : ` for ${account.user}`}}}`;
 }
 
-function batchPrompt(runId, batch, account, fallback) {
+// prefix: the browser tool prefix the rules name, or null for the plugin's agents (rules built in).
+function batchPrompt(runId, batch, account, prefix) {
   const lines = [
     `Run these test cases in order, in one browser session (run \`${runId}\`):`,
     ...batch.cases.map((id) => `- ${id}: ${displayPath(join(tcDir(runId, id), 'brief.md'))}`),
     '',
     `Login: ${passwordSlot(account)}. Never write the password to a file.`,
   ];
-  return fallback ? `${agentBody(FALLBACK_PREFIX)}\n\n---\n\n${lines.join('\n')}` : lines.join('\n');
+  return prefix === null ? lines.join('\n') : `${agentBody(prefix)}\n\n---\n\n${lines.join('\n')}`;
 }
 
-// Picks the next batch that can start now, or says why none can. `fallback` means the plugin's
-// agents are not available: one general-purpose agent at a time on the shared `playwright` server.
+// Picks the next batch that can start now, or says why none can. `fallback` means Claude Code
+// without the plugin's agents: one general-purpose agent at a time on the shared `playwright`
+// server. Other harnesses always run that way, on the shared `qa-browser` server.
 export function nextLaunch(runId, { fallback = false } = {}) {
   const schedule = readSchedule(runId);
   if (!schedule) throw new Error(`run ${runId} has no schedule.json; run init again`);
+  const harness = schedule.harness || 'claude-code';
+  if (!hasPool(harness)) fallback = true;
   const running = schedule.batches.filter((b) => b.state === 'running');
   const pending = schedule.batches.filter((b) => b.state === 'pending');
   if (!pending.length) return { kind: running.length ? 'wait' : 'done', running };
@@ -169,15 +176,17 @@ export function nextLaunch(runId, { fallback = false } = {}) {
     }
     const slot = Array.from({ length: limit }, (_, i) => i + 1).find((s) => !busySlots.has(s));
     const usePool = !fallback && batch.pool;
+    const claude = harness === 'claude-code';
     Object.assign(batch, {
       state: 'running',
       slot,
       account: { user: account.user, ...(account.secret && { secret: account.secret }) },
-      agent: usePool ? agentType(slot) : 'general-purpose',
+      agent: usePool ? agentType(slot) : claude ? 'general-purpose' : 'test-agent',
       startedAt: new Date().toISOString(),
     });
     writeSchedule(runId, schedule);
-    return { kind: 'launch', batch, prompt: batchPrompt(runId, batch, account, !usePool) };
+    const prefix = usePool ? null : claude ? FALLBACK_PREFIX : GENERIC_PREFIX;
+    return { kind: 'launch', harness, batch, prompt: batchPrompt(runId, batch, account, prefix) };
   }
   if (!running.length && pending.length)
     throw new Error(`no batch can start: ${blockedBy.join('; ') || 'check execution.accounts variants in .qa/config.json'}`);
@@ -220,11 +229,16 @@ function archiveAttempt(runId, tcId) {
 // re-run on the standard tier. Idempotent: a case escalates at most once.
 export function escalate(run) {
   const schedule = readSchedule(run.id);
-  if (!schedule || !execution().escalate) return [];
-  const route = execution().routes[ESCALATION];
+  if (!schedule) return [];
+  const ex = execution(schedule.harness);
+  if (!ex.escalate) return [];
+  const route = ex.routes[ESCALATION];
   const byId = new Map(run.testCases.map((tc) => [tc.id, tc]));
   const added = [];
-  for (const batch of schedule.batches.filter((b) => b.state === 'done' && b.model === 'haiku' && !b.escalated)) {
+  // Only a batch that ran on another model than the escalation tier's gets a second look: with
+  // no model routing (most harnesses) a re-run would just repeat the same model's call.
+  const cheaper = (b) => (b.tier === 'simple' || b.model === 'haiku') && b.model && route.model && b.model !== route.model;
+  for (const batch of schedule.batches.filter((b) => b.state === 'done' && cheaper(b) && !b.escalated)) {
     const redo = batch.cases
       .map((id) => byId.get(id))
       .filter(Boolean)

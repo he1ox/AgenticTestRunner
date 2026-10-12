@@ -302,7 +302,7 @@ async function suites(req, res, id, action) {
 }
 
 // "Repair with agent": a new run of one failed replay case, ready for the orchestrator to execute.
-// Launching the Test Agent stays with Claude Code, where the password and the agent pool live.
+// Launching the Test Agent stays with the human's agent session, where the password and the browser live.
 function heal(res, runId, tcId) {
   if (!tcId || !existsSync(join(runDir(runId), 'plan.json'))) return send(res, 404, { error: 'unknown run or case' });
   const out = spawnSync(process.execPath, [QA_RUNS, '--project', PROJECT_ROOT, 'heal', runId, tcId], {

@@ -1,6 +1,9 @@
 {
   "name": "AgenticTestRunner",
-  "owner": { "name": "jorge.lopezg" },
+  "description": "qa-runner: E2E test plans run by browser agents, reviewed in a local viewer.",
+  "owner": {
+    "name": "jorge.lopezg"
+  },
   "plugins": [
     {
       "name": "qa-runner",

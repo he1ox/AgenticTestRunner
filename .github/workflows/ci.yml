@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Skills follow the Agent Skills spec
+        run: node scripts/validate-skills.mjs
+
+      - name: Generated agents and manifests are up to date
+        run: node scripts/build.mjs --check
+
+      - name: Scripts parse
+        run: for f in $(git ls-files '*.mjs'); do node --check "$f"; done
+
+      - name: Example plan initializes for every harness
+        run: |
+          node skills/run-test-plan/scripts/qa-runs.mjs --project examples init examples/.qa/plans/SHOP-42.plan.json --check
+          for h in claude-code codex cursor gemini opencode copilot generic; do
+            work="$RUNNER_TEMP/$h" && mkdir -p "$work" && cp -r examples/.qa "$work/"
+            Q="node $PWD/skills/run-test-plan/scripts/qa-runs.mjs --project $work"
+            $Q init "$work/.qa/plans/SHOP-42.plan.json" --harness "$h" > /dev/null
+            run=$($Q latest)
+            $Q next "$run" | grep -q '^LAUNCH ' || { echo "next printed no LAUNCH for $h"; exit 1; }
+          done
+
+      - name: npx skills finds every skill
+        run: |
+          npx -y skills@1.7.2 add ./ --list | sed 's/\x1b\[[0-9;]*m//g' > skills.txt
+          for s in run-test-plan write-test-plan qa-setup replay-test-plan; do
+            grep -q "$s" skills.txt || { echo "npx skills did not list $s"; cat skills.txt; exit 1; }
+          done

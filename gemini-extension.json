@@ -1,0 +1,15 @@
+{
+  "name": "qa-runner",
+  "version": "0.8.0",
+  "description": "Run manual-style E2E test plans with browser agents in any coding agent (Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Copilot), review the evidence in a local viewer, and retest what a human rejects.",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "qa-browser": {
+      "command": "node",
+      "args": [
+        "${extensionPath}/skills/run-test-plan/scripts/browser-mcp.mjs",
+        "shared"
+      ]
+    }
+  }
+}

@@ -1,17 +1,26 @@
 {
   "name": "qa-runner",
-  "version": "0.6.0",
-  "description": "Run manual-style E2E test plans with browser agents, review the evidence in a local viewer, and retest what a human rejects.",
+  "version": "0.8.0",
+  "description": "Run manual-style E2E test plans with browser agents in any coding agent (Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Copilot), review the evidence in a local viewer, and retest what a human rejects.",
   "author": {
     "name": "jorge.lopezg"
   },
+  "homepage": "https://github.com/he1ox/AgenticTestRunner",
+  "repository": "https://github.com/he1ox/AgenticTestRunner",
   "license": "MIT",
   "keywords": [
     "qa",
     "e2e",
     "testing",
     "playwright",
-    "test-plan"
+    "test-plan",
+    "agent-skills",
+    "browser-agents"
+  ],
+  "agents": [
+    "./claude/agents/test-agent-1.md",
+    "./claude/agents/test-agent-2.md",
+    "./claude/agents/test-agent-3.md"
   ],
   "mcpServers": {
     "qa-browser-1": {

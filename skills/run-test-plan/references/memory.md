@@ -8,7 +8,8 @@ runs reuse instead of asking again.
 One Markdown file per memory, with JSON header values:
 
 - `.qa/memory/` — shared with the project; commit it and review changes in pull requests.
-- `~/.claude/qa-memory/` — personal (`QA_USER_MEMORY_DIR` overrides).
+- `~/.qa/memory/` — personal, shared by every agent harness (`QA_USER_MEMORY_DIR` overrides; an
+  existing `~/.claude/qa-memory/` is used until `~/.qa/memory/` exists).
 
 Kinds: `data` (a value), `procedure` (how to get past something), `env-quirk` (applies to any
 step in that variant, e.g. a banner to dismiss), `gotcha`. A `scope.variants` limits a memory to

@@ -1,7 +1,16 @@
 # qa-runner
 
-A Claude Code plugin that runs manual-style end-to-end test plans with browser agents, shows the
-results in a local viewer, and reruns only the cases a human rejects.
+[![skills.sh](https://skills.sh/b/he1ox/AgenticTestRunner)](https://skills.sh/he1ox/AgenticTestRunner)
+[![ci](https://github.com/he1ox/AgenticTestRunner/actions/workflows/ci.yml/badge.svg)](https://github.com/he1ox/AgenticTestRunner/actions/workflows/ci.yml)
+
+Agent skills that run manual-style end-to-end test plans with browser agents, show the results
+in a local viewer, and rerun only the cases a human rejects. They work in any coding agent that
+runs shell commands: Claude Code, Codex, Cursor, Gemini CLI, OpenCode, GitHub Copilot CLI and
+others.
+
+```bash
+npx skills add he1ox/AgenticTestRunner
+```
 
 ```
 plan.json ──init──▶ brief.md per case ──Test Agent (browser)──▶ result.json + evidence/
@@ -10,28 +19,29 @@ plan.json ──init──▶ brief.md per case ──Test Agent (browser)──
 ```
 
 - **Plans as data.** Test cases, steps, variants and guardrails live in a JSON plan.
-- **Dedicated Test Agents.** The plugin ships Test Agents whose prompt holds only the testing
-  rules and whose tools are only Read, Write, Bash and their own browser, so each agent starts
-  small and every case's brief is about 1.5 KB.
-- **Parallel and right-sized.** `init` splits the plan into batches and picks a model and effort
-  per batch: short read-only cases go to Haiku, cases that change data or need judgment go to
-  Sonnet. Any failure Haiku reports is re-run on Sonnet before you see it. Up to three batches
-  run at once, each in its own isolated browser, with one account each when your app allows
-  only one session per user.
+- **Any agent.** The orchestration is a zero-dependency Node CLI; your agent only launches what
+  it prints. Test Agents start as your agent's own subagents, or run inline when it has none.
+- **Small Test Agents.** Their prompt holds only the testing rules, and every case's brief is
+  about 1.5 KB.
+- **Right-sized.** `init` splits the plan into batches and gives each a tier and effort. In
+  Claude Code short read-only cases go to Haiku, cases that change data or need judgment to
+  Sonnet, and any failure Haiku reports is re-run on Sonnet before you see it. With the Claude
+  Code plugin, up to three batches run at once, each in its own isolated browser, with one
+  account each when your app allows only one session per user.
 - **Contract checks.** `validate` flags missing evidence, unexplained failures, missing
   recordings and leaked credentials before anyone trusts a verdict.
 - **Dashboard.** The viewer opens on how your agents are doing: pass rate, failures, blocked
   cases, average agent time per case (excluding time waiting on you), reviewer agreement and
   questions asked, plus cost per run (API list-price equivalent, exact from agent
-  transcripts), with outcomes by run and by variant, cases that need attention, the slowest
+  transcripts; "n/a" when the harness reports no usage or the model has no price), with outcomes by run and by variant, cases that need attention, the slowest
   cases, and your recent runs. Filter by date range and plan.
 - **Local viewer.** Live progress, screenshots with non-destructive marks (arrows, boxes,
   spotlight, blur), recordings, a per-case agent chat, and Approve / Needs retest / Reject.
 - **Reference comparison.** Optionally compare each case against another app (legacy,
   production, a design) and report deviations.
 - **Test library and Test plans.** Every case an agent passes is saved as a script, read from
-  the agent's transcript at no extra cost: same steps, same annotated screenshots, same
-  recording. In the viewer you group scripts into Test plans ("Release 1.0.1", tags `smoke`,
+  the browser server's own call log (or the agent's transcript in Claude Code) at no extra cost,
+  with any agent: same steps, same annotated screenshots, same recording. In the viewer you group scripts into Test plans ("Release 1.0.1", tags `smoke`,
   `regression`…) and run them deterministically: no agent, no tokens. When a replay fails because
   the UI changed on purpose, "Repair with agent" re-records just that case.
 - **Memory.** When an agent needs a value it does not have, it asks you in the viewer and waits.
@@ -39,75 +49,98 @@ plan.json ──init──▶ brief.md per case ──Test Agent (browser)──
   what they learned; nothing is reused until you approve it. Secrets are stored only as
   `env:NAME` references.
 
+## Skills
+
+| Skill | Use it to |
+|---|---|
+| [`qa-setup`](skills/qa-setup/SKILL.md) | Prepare a project once: check Node/npx/ffmpeg, register the browser, write `.qa/config.json` |
+| [`write-test-plan`](skills/write-test-plan/SKILL.md) | Turn a ticket into `.qa/plans/<KEY>.plan.json` and get the case list approved |
+| [`run-test-plan`](skills/run-test-plan/SKILL.md) | Run the plan with browser agents, open the viewer, retest what a reviewer rejects |
+| [`replay-test-plan`](skills/replay-test-plan/SKILL.md) | Replay saved Test plans without an agent, repair stale scripts |
+
+Install all four: the last three call the CLI that lives in `run-test-plan`.
+
 ## Requirements
 
-- [Claude Code](https://docs.claude.com/en/docs/claude-code)
+- An agent that runs shell commands and MCP tools
 - Node.js 20+ (no npm dependencies)
-- `npx` on the PATH: the plugin starts its own pool of [Playwright MCP](https://github.com/microsoft/playwright-mcp)
-  browsers (`qa-browser-1..3`, pinned version, isolated profiles)
+- `npx` on the PATH: the browser is [Playwright MCP](https://github.com/microsoft/playwright-mcp)
+  (pinned version, isolated profile)
 - `ffmpeg` on the PATH, only for recordings
 
 ## Install
 
+**Any agent, with the [skills CLI](https://github.com/vercel-labs/skills):**
+
+```bash
+npx skills add he1ox/AgenticTestRunner
+```
+
+It detects your agents and installs the four skills for each (`-a codex -a cursor` to choose,
+`-g` for every project, `--list` to see them first). Then register the browser once: ask your
+agent to "set up qa-runner" (the `qa-setup` skill), or run
+`node <skills folder>/run-test-plan/scripts/qa-runs.mjs doctor --harness <your agent>`, which
+prints the exact command for your agent.
+
+**Or as a plugin, which also registers the browser for you.** Pick one install per agent, plugin
+or `npx skills`, not both, or every skill shows up twice.
+
+| Agent | Install |
+|---|---|
+| Claude Code | `claude plugin marketplace add he1ox/AgenticTestRunner`, then `claude plugin install qa-runner@AgenticTestRunner` (adds the 3-browser pool and dedicated Test Agents) |
+| Codex | `codex plugin marketplace add he1ox/AgenticTestRunner`, then install `qa-runner` from `/plugins` |
+| GitHub Copilot CLI | `copilot plugin install he1ox/AgenticTestRunner` |
+| Cursor | install from the repository URL as an Agent Plugin (`plugin.json` + `mcp.json` at the root) |
+| Gemini CLI | `gemini extensions install https://github.com/he1ox/AgenticTestRunner` |
+| VS Code | **Chat: Install Plugin From Source** with the repository URL |
+| OpenCode, others | `npx skills add`, then register the browser as above |
+
+What works where:
+
+| | Claude Code plugin | Any other install |
+|---|---|---|
+| Plans, runs, viewer, review, retest, memory, questions | yes | yes |
+| Parallel batches (3 isolated browsers) | yes | one at a time |
+| Model per tier (Haiku, escalation to Sonnet) | yes | session model, or `execution.tiers` |
+| Script library (passing cases saved as replayable scripts) | yes | yes, from the browser server's call log |
+| Cost per run | exact, from transcripts | from reported tokens priced by `config.pricing`, else "n/a" |
+| Viewer chat | `claude -p` | the harness's headless CLI (`codex exec`, `gemini -p`, `opencode run`, `copilot -p`); none for Cursor |
+
+Per-agent details: [`references/harness/`](skills/run-test-plan/references/harness/).
+
+### Claude Code plugin, step by step
+
 This fork ([he1ox/AgenticTestRunner](https://github.com/he1ox/AgenticTestRunner)) is its own
-plugin marketplace. The marketplace is named `AgenticTestRunner`, after the repo, and the
-plugin `qa-runner`. If you already installed the upstream plugin from the `jorgeebits/qa-runner`
-marketplace, uninstall it first with `claude plugin uninstall qa-runner@qa-runner`: both register
-the same agents and browser tools.
-
-1. Add the fork as a plugin marketplace and install the plugin:
-
-   ```bash
-   claude plugin marketplace add he1ox/AgenticTestRunner
-   ```
-
-   ```bash
-   claude plugin install qa-runner@AgenticTestRunner
-   ```
-
-   Inside a Claude Code session the same steps are `/plugin marketplace add he1ox/AgenticTestRunner`
-   and `/plugin install qa-runner@AgenticTestRunner`. Restart Claude Code afterwards so the
-   `run-test-plan` skill loads.
-
-2. Nothing else to register: the plugin starts its browser pool and Test Agents itself. Only if
-   you use the skill without the plugin (copied into `.claude/skills/`), register a Playwright
-   MCP server named `playwright`; agents then run one at a time as general-purpose agents:
-
-   ```bash
-   claude mcp add playwright -- npx @playwright/mcp@0.0.82
-   ```
-
-3. Optional, for recordings: install `ffmpeg` (`winget install Gyan.FFmpeg`,
-   `brew install ffmpeg` or `sudo apt install ffmpeg`) and make sure it is on the PATH.
-
-4. Check the install with `claude plugin list` and `claude mcp list`. `qa-runner@AgenticTestRunner`
-   should be listed as enabled, and `qa-browser-1..3` should appear once a session has started.
-
-5. Use the skill from the Claude Code CLI: open `claude` in the project you want to test and
-   ask for it in plain words ("run the test plan for SHOP-42"), or call it directly with
-   `/qa-runner:run-test-plan` (see [Use](#use)).
-
-To update, run `claude plugin marketplace update AgenticTestRunner` and then
-`claude plugin update qa-runner@AgenticTestRunner`. To remove it, run
-`claude plugin uninstall qa-runner@AgenticTestRunner`.
-
-To work on the plugin itself, clone the fork and add the local folder instead:
+plugin marketplace, named `AgenticTestRunner`; the plugin is `qa-runner`. If you installed the
+upstream plugin from the `jorgeebits/qa-runner` marketplace, uninstall it first with
+`claude plugin uninstall qa-runner@qa-runner`: both register the same agents and browser tools.
 
 ```bash
-git clone https://github.com/he1ox/AgenticTestRunner.git
+claude plugin marketplace add he1ox/AgenticTestRunner
 ```
 
 ```bash
-claude plugin marketplace add ./AgenticTestRunner
+claude plugin install qa-runner@AgenticTestRunner
 ```
+
+Restart Claude Code so the skills load. `claude plugin list` should show
+`qa-runner@AgenticTestRunner` enabled, and `claude mcp list` the servers `qa-browser-1..3` once a
+session has started. Call a skill directly with `/qa-runner:run-test-plan`. To update:
+`claude plugin marketplace update AgenticTestRunner`, then
+`claude plugin update qa-runner@AgenticTestRunner`.
+
+Optional, for recordings: install `ffmpeg` (`winget install Gyan.FFmpeg`, `brew install ffmpeg`
+or `sudo apt install ffmpeg`).
 
 ## Set up a project
 
-Create `.qa/config.json` in the project you test (every field is optional; see
+Ask your agent to "set up qa-runner" (the `qa-setup` skill), or create `.qa/config.json` in the
+project you test yourself (every field is optional; see
 `skills/run-test-plan/schemas/config.schema.json`):
 
 ```json
 {
+  "harness": "codex",
   "tracker": { "name": "GitHub", "issueUrl": "https://github.com/org/repo/issues/{key}" },
   "targets": { "app": "New checkout", "reference": "Legacy checkout" },
   "variants": { "device": { "label": "Device", "values": ["desktop", "mobile"] } },
@@ -134,14 +167,15 @@ team, and `.qa/tests/` and `.qa/suites/` (the test library and Test plans). `exa
 
 ## Use
 
-Ask Claude to run a test plan ("run the test plan for SHOP-42", "corre los test cases"). The
-`run-test-plan` skill drafts or reuses `.qa/plans/<KEY>.plan.json`, asks you to approve the
-cases, runs them, and opens the viewer at `http://127.0.0.1:4321`.
+Ask your agent to run a test plan ("run the test plan for SHOP-42", "corre los test cases"). The
+skills draft or reuse `.qa/plans/<KEY>.plan.json`, ask you to approve the cases, run them, and
+open the viewer at `http://127.0.0.1:4321`.
 
 The CLI also works on its own:
 
 ```bash
-node skills/run-test-plan/scripts/qa-runs.mjs init .qa/plans/SHOP-42.plan.json --label smoke
+node skills/run-test-plan/scripts/qa-runs.mjs doctor --harness codex
+node skills/run-test-plan/scripts/qa-runs.mjs init .qa/plans/SHOP-42.plan.json --label smoke --harness codex
 node skills/run-test-plan/scripts/qa-runs.mjs open
 node skills/run-test-plan/scripts/qa-runs.mjs next <runId>
 node skills/run-test-plan/scripts/qa-runs.mjs validate <runId>
@@ -152,14 +186,16 @@ node skills/run-test-plan/scripts/qa-runs.mjs memory --help
 | Variable | Default | Purpose |
 |---|---|---|
 | `QA_PROJECT_DIR` | current directory | Project whose `.qa/` folder is used |
+| `QA_HARNESS` | detected, else `generic` | Agent harness, when `.qa/config.json` and `--harness` don't say |
 | `QA_RUNS_DIR` | `.qa/runs` | Where runs are written |
 | `QA_VIEWER_PORT` | `4321` | Viewer port |
-| `QA_CHAT_MODEL` | `sonnet` | Model behind the viewer's agent chat |
+| `QA_CHAT_HARNESS` | project's harness | CLI behind the viewer's agent chat: `claude`, `codex`, `gemini`, `opencode`, `copilot` |
+| `QA_CHAT_BIN` | that CLI | Binary the chat runs (`QA_CLAUDE_BIN` is the old name, for `claude`) |
+| `QA_CHAT_MODEL` | `sonnet` (Claude), else the CLI's default | Model behind the viewer's agent chat |
 | `QA_CHAT_EFFORT` | `low` | Effort for the viewer's agent chat |
 | `QA_PLAYWRIGHT_MCP` | `@playwright/mcp@0.0.82` | Playwright MCP package the browser pool runs |
 | `QA_BROWSER_ARGS` | none | Extra Playwright MCP flags for every browser, e.g. `--headless` |
-| `QA_CLAUDE_BIN` | `claude` | Claude Code binary the chat runs |
-| `QA_USER_MEMORY_DIR` | `~/.claude/qa-memory` | Personal memory folder |
+| `QA_USER_MEMORY_DIR` | `~/.qa/memory` | Personal memory folder |
 | `QA_PASSWORD` | none | Password deterministic replays type when the account has no `secret` |
 | `QA_REPLAY_DEBUG` | off | Print every action a deterministic replay sends and the browser's reply |
 
@@ -178,17 +214,20 @@ node skills/run-test-plan/scripts/qa-runs.mjs suite run release-1.0.1
 ```
 
 Scripts type the login password from the account's `env:NAME` secret or `QA_PASSWORD`, so start
-the viewer from a shell that has them. See
-[`references/library.md`](skills/run-test-plan/references/library.md).
+the viewer from a shell that has them. See the
+[`replay-test-plan`](skills/replay-test-plan/SKILL.md) skill.
 
 `profile` shows where agents' tokens went (context size per turn, tool results by tool), from any
 transcripts, so you can measure a change against earlier runs.
 
 ## Develop
 
-The Test Agents' rules live in `skills/run-test-plan/scripts/agents.mjs`. After changing them,
-regenerate `agents/` and the browser pool in `.claude-plugin/plugin.json` with `node scripts/build-agents.mjs` (`--check` fails when
-they are out of date).
+See [AGENTS.md](AGENTS.md). In short: the Test Agents' rules live in
+`skills/run-test-plan/scripts/agents.mjs` and the metadata in `.claude-plugin/plugin.json`;
+`node scripts/build.mjs` regenerates every agent file and manifest from them, and
+`node scripts/validate-skills.mjs` checks the skills against the
+[Agent Skills spec](https://agentskills.io/specification). CI runs both. Changes are listed in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## Roadmap
 

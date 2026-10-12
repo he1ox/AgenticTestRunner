@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "qa-browser": {
+      "command": "node",
+      "args": [
+        "${PLUGIN_ROOT}/skills/run-test-plan/scripts/browser-mcp.mjs",
+        "shared"
+      ]
+    }
+  }
+}

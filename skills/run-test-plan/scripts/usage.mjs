@@ -1,9 +1,11 @@
-// What a run cost. Test Agents run as Claude Code subagents whose transcripts carry exact
-// per-message usage (model, input, cache writes, cache reads, output), so the orchestrator
-// records each group right after it finishes: the harness may clear a transcript later. When the
-// transcript is gone, the completion notice's token count is recorded instead and priced by
-// calibration against groups that have both numbers, flagged as estimated. The viewer's
-// chat turns report their own dollar cost, which is added as is.
+// What a run cost. In Claude Code, Test Agents' transcripts carry exact per-message usage (model,
+// input, cache writes, cache reads, output), so the orchestrator records each group right after it
+// finishes: the harness may clear a transcript later. When the transcript is gone, the completion
+// notice's token count is recorded instead and priced by calibration against groups that have
+// both numbers, flagged as estimated. Other harnesses report what they can: an input/output split
+// is priced like a transcript, a bare total only by calibration, and nothing at all is recorded
+// as "not reported". A model with no known price (pricing.mjs, .qa/config.json → pricing) costs
+// "n/a", never another model's price. The viewer's chat turns report their own dollar cost.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { costOf, priceFor, promptTokens } from './pricing.mjs';
@@ -12,9 +14,10 @@ import { listRuns, readJson, runDir, writeJson } from './lib.mjs';
 const usageFile = (runId) => join(runDir(runId), 'usage.json');
 const emptyTokens = () => ({ input: 0, cacheWrite5m: 0, cacheWrite1h: 0, cacheRead: 0, output: 0 });
 
-// MCP tools from different servers (playwright, the qa-browser pool) do the same job, so the
-// profile groups them by the tool's own name.
-const toolName = (name) => String(name || 'unknown').replace(/^mcp__.+?__/, '');
+// MCP tools from different servers (playwright, the qa-browser pool, other harnesses' prefixes) do
+// the same job, so the profile groups them by the tool's own name.
+const toolName = (name) =>
+  /(?:^|[^A-Za-z0-9])(browser_[a-z_]+)$/.exec(String(name || ''))?.[1] || String(name || 'unknown').replace(/^mcp__.+?__/, '');
 
 const resultSize = (content) => {
   if (typeof content === 'string') return { chars: content.length, images: 0 };
@@ -88,6 +91,18 @@ export function parseTranscript(file) {
   return { messages: finalUsage.size, byModel, profile };
 }
 
+// A partial profile from the browser proxy's call log (tests.mjs browserCalls) for harnesses with no
+// transcript: what each browser tool returned, without turns or context sizes.
+export function browserProfile(calls) {
+  const tools = {};
+  for (const call of calls) {
+    const tool = (tools[toolName(call.name)] ||= { calls: 0, resultChars: 0, images: 0 });
+    tool.calls += 1;
+    tool.resultChars += String(call.text || '').length;
+  }
+  return { source: 'browser log', turns: null, firstContext: null, peakContext: null, snapshots: tools.browser_snapshot?.calls || 0, imageReads: null, tools };
+}
+
 const totalTokens = (t) =>
   t.input + t.cacheWrite5m + t.cacheWrite1h + t.cacheRead + t.output + (t.long ? totalTokens(t.long) : 0);
 
@@ -107,7 +122,8 @@ function calibratedRate(model) {
   return reported ? cost / reported : null;
 }
 
-export function recordUsage(runId, { group, cases, transcript, tokens, model, effort, tier, toolUses, durationMs }) {
+// split: { input, output, cacheRead } from a harness that reports them (Codex, Gemini CLI…).
+export function recordUsage(runId, { group, cases, transcript, tokens, split, model, effort, tier, toolUses, durationMs, profile }) {
   if (!existsSync(join(runDir(runId), 'plan.json'))) throw new Error(`unknown run ${runId}`);
   const entries = readJson(usageFile(runId), []);
   const base = {
@@ -136,10 +152,27 @@ export function recordUsage(runId, { group, cases, transcript, tokens, model, ef
         estimated: cost === null,
       });
     }
+  } else if (split) {
+    const id = (model && priceFor(model)?.id) || model || 'unknown';
+    const t = { ...emptyTokens(), input: Number(split.input) || 0, cacheRead: Number(split.cacheRead) || 0, output: Number(split.output) || 0 };
+    const cost = costOf(id, t);
+    added.push({
+      ...(profile && { profile }),
+      ...base,
+      source: 'reported split',
+      model: id,
+      tokens: t,
+      totalTokens: totalTokens(t),
+      reportedTokens: tokens ? Number(tokens) : null,
+      costUsd: cost,
+      estimated: false,
+      ...(cost === null && { rateSource: `no price for model "${id}": add it to .qa/config.json → pricing` }),
+    });
   } else if (tokens) {
-    const id = priceFor(model || 'sonnet')?.id || model;
+    const id = (model && priceFor(model)?.id) || model || 'unknown';
     const rate = calibratedRate(id);
     added.push({
+      ...(profile && { profile }),
       ...base,
       source: transcript ? 'reported (transcript was empty)' : 'reported',
       model: id,
@@ -150,7 +183,19 @@ export function recordUsage(runId, { group, cases, transcript, tokens, model, ef
       estimated: true,
       rateSource: rate ? 'calibrated from exact runs' : 'no calibration yet: record one group from its transcript',
     });
-  } else throw new Error('give --transcript <file> or --tokens <n>');
+  } else
+    // The harness reports no usage: the batch is accounted for, at an unknown cost.
+    added.push({
+      ...(profile && { profile }),
+      ...base,
+      source: 'not reported',
+      model: (model && priceFor(model)?.id) || model || 'unknown',
+      tokens: null,
+      totalTokens: null,
+      reportedTokens: null,
+      costUsd: null,
+      estimated: false,
+    });
   writeJson(usageFile(runId), [...entries.filter((e) => !(group && e.group === group && e.cases?.join() === (cases || []).join())), ...added]);
   return added;
 }
@@ -176,6 +221,8 @@ export function runCost(runId, testCases) {
   const entries = readJson(usageFile(runId), []);
   const chat = chatCost(runId, testCases);
   const agents = entries.reduce((sum, e) => sum + (e.costUsd || 0), 0);
+  // Batches with no price (unknown model, no usage reported) are n/a, not $0.
+  const priced = entries.filter((e) => e.costUsd !== null && e.costUsd !== undefined);
   // Entries are per batch (a group or a chunk of one), so coverage is checked case by case.
   const covered = new Set(entries.flatMap((e) => e.cases || []));
   const recordedGroups = new Set(entries.map((e) => e.group).filter(Boolean));
@@ -188,8 +235,8 @@ export function runCost(runId, testCases) {
   return {
     profile: mergeProfiles(entries.map((e) => e.profile).filter(Boolean)),
     models: [...new Set(entries.map((e) => e.model))],
-    totalUsd: entries.length || chat.turns ? agents + chat.cost : null,
-    agentsUsd: entries.length ? agents : null,
+    totalUsd: priced.length || chat.turns ? agents + chat.cost : null,
+    agentsUsd: priced.length ? agents : null,
     chatUsd: chat.turns ? chat.cost : null,
     chatTurns: chat.turns,
     tokens: entries.reduce((sum, e) => sum + (e.totalTokens || 0), 0),
@@ -206,7 +253,8 @@ export function mergeProfiles(profiles) {
   if (!profiles.length) return null;
   const merged = { agents: 0, turns: 0, firstContextSum: 0, peakContext: 0, snapshots: 0, imageReads: 0, tools: {} };
   for (const p of profiles) {
-    const agents = p.agents || 1;
+    // A browser-log profile has tool sizes but no turns or context: it adds to the tools only.
+    const agents = p.firstContext === null && p.firstContextSum === undefined ? 0 : p.agents || 1;
     merged.agents += agents;
     merged.turns += p.turns || 0;
     merged.firstContextSum += p.firstContextSum ?? (p.firstContext || 0) * agents;
@@ -220,6 +268,6 @@ export function mergeProfiles(profiles) {
       into.images += t.images || 0;
     }
   }
-  merged.firstContext = Math.round(merged.firstContextSum / merged.agents);
+  merged.firstContext = merged.agents ? Math.round(merged.firstContextSum / merged.agents) : null;
   return merged;
 }
