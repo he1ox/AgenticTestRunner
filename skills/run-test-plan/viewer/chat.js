@@ -73,6 +73,15 @@ export function createChat({ api, getContext, onTurnFinished, toast }) {
     state.lastRender = snapshot;
     const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
     const messages = data.messages || [];
+    // No headless CLI for this harness, or it is not installed: say why instead of failing on send.
+    const disabled = data.available === false;
+    input.disabled = disabled;
+    send.disabled = disabled;
+    if (disabled) {
+      list.innerHTML = `${messages.length ? messages.map((m) => `<div class="msg ${m.role === 'user' ? 'user' : 'agent'}">${markdown(m.text || '')}</div>`).join('') : ''}
+        <div class="chat-empty"><p class="msg-error">${icon('warn')}${esc(data.reason || 'The chat is not available.')}</p></div>`;
+      return;
+    }
     list.innerHTML =
       messages.length || data.pending
         ? [
@@ -88,7 +97,7 @@ export function createChat({ api, getContext, onTurnFinished, toast }) {
         : `<div class="chat-empty">
           <p>Ask the agent about this case, or have it mark up the screenshots: arrows, boxes, text, spotlight or blur.</p>
           <div class="suggestions">${SUGGESTIONS.map((s) => `<button type="button" class="suggestion">${esc(s)}</button>`).join('')}</div>
-          <p class="chat-note">Cada respuesta corre un agente de Claude (${esc(data.model || 'sonnet')}) que solo puede leer los archivos de esta corrida y anotar capturas.</p>
+          <p class="chat-note">Each answer runs ${esc(data.label || 'an agent CLI')}${data.model ? ` (${esc(data.model)})` : ''}, which can only read this run's files and mark up screenshots.</p>
         </div>`;
     if (atBottom || data.pending) list.scrollTop = list.scrollHeight;
   }

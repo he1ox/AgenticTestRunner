@@ -28,6 +28,19 @@
       "type": "integer",
       "default": 4321
     },
+    "harness": {
+      "type": "string",
+      "enum": [
+        "claude-code",
+        "codex",
+        "cursor",
+        "gemini",
+        "opencode",
+        "copilot",
+        "generic"
+      ],
+      "description": "Agent harness that runs the orchestrator: how Test Agents are launched and which models tiers default to (references/harness/<name>.md). Overridden by init --harness and QA_HARNESS; detected for Claude Code, else generic."
+    },
     "tracker": {
       "type": "object",
       "properties": {
@@ -195,7 +208,7 @@
         },
         "tiers": {
           "type": "object",
-          "description": "Model and effort per tier; see references/execute.md.",
+          "description": "Model and effort per tier; see references/execute.md. Claude Code defaults to haiku/sonnet; other harnesses run on the session model unless a model is set here.",
           "properties": {
             "simple": {
               "type": "object",
@@ -267,7 +280,7 @@
         "escalate": {
           "type": "boolean",
           "default": true,
-          "description": "Re-run once on the standard tier any case a haiku batch reports as fail, blocked, unfinished or with contract warnings."
+          "description": "Re-run once on the standard tier any case a simple-tier batch (on a different model than the standard tier) reports as fail, blocked, unfinished or with contract warnings."
         },
         "replayTimeoutMs": {
           "type": "integer",

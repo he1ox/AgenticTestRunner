@@ -8,9 +8,17 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { CONFIG, PROJECT_ROOT, safeJoin } from './lib.mjs';
 
+// Personal memory is shared by every agent harness, so it lives outside any one harness's folder;
+// a ~/.claude/qa-memory from before 0.7.0 keeps working until ~/.qa/memory exists.
+function userMemoryDir() {
+  const legacy = join(homedir(), '.claude', 'qa-memory');
+  const current = join(homedir(), '.qa', 'memory');
+  return !existsSync(current) && existsSync(legacy) ? legacy : current;
+}
+
 export const MEMORY_DIRS = {
   project: resolve(PROJECT_ROOT, CONFIG.memory?.dir || '.qa/memory'),
-  user: resolve(process.env.QA_USER_MEMORY_DIR || join(homedir(), '.claude', 'qa-memory')),
+  user: resolve(process.env.QA_USER_MEMORY_DIR || userMemoryDir()),
 };
 export const KINDS = ['data', 'procedure', 'env-quirk', 'gotcha'];
 export const MEMORY_STATUSES = ['proposed', 'active', 'stale'];

@@ -441,7 +441,8 @@ export function createDashboard({ host, api, icon, onOpenRun, onOpenCase }) {
     let snapshots = 0;
     let imageReads = 0;
     for (const p of profiles) {
-      agents += p.agents || 1;
+      // Profiles from the browser proxy's log (harnesses without transcripts) count no agents.
+      agents += p.agents ?? (p.firstContext === null ? 0 : 1);
       firstSum += p.firstContextSum ?? p.firstContext ?? 0;
       peak = Math.max(peak, p.peakContext || 0);
       snapshots += p.snapshots || 0;
@@ -467,7 +468,7 @@ export function createDashboard({ host, api, icon, onOpenRun, onOpenCase }) {
       return card(
         'Where agent context goes',
         modelLine || 'No transcript profiles in range yet.',
-        el('p', { class: 'dash-empty', text: 'Record batches with qa-runs.mjs usage --transcript to see which tool results fill the agents’ context.' }),
+        el('p', { class: 'dash-empty', text: 'Record batches with qa-runs.mjs usage --batch to see which tool results fill the agents’ context.' }),
       );
     const k = (n) => `${Math.round(n / 1000)}K`;
     const W = 420;
@@ -498,7 +499,9 @@ export function createDashboard({ host, api, icon, onOpenRun, onOpenCase }) {
     });
     return card(
       'Where agent context goes',
-      `${agents} agent${agents === 1 ? '' : 's'} · starting context ${k(firstSum / agents)} on average, peak ${k(peak)} · ${snapshots} full snapshots · ${imageReads} screenshots read back. ${modelLine}`,
+      agents
+        ? `${agents} agent${agents === 1 ? '' : 's'} · starting context ${k(firstSum / agents)} on average, peak ${k(peak)} · ${snapshots} full snapshots · ${imageReads} screenshots read back. ${modelLine}`
+        : `Browser tool results only (no transcripts in range) · ${snapshots} full snapshots. ${modelLine}`,
       svg,
       dataTable(
         ['Tool', 'Calls', 'Result chars', 'Share'],
@@ -676,7 +679,7 @@ export function createDashboard({ host, api, icon, onOpenRun, onOpenCase }) {
         ),
         el('td', { class: 'num', text: pct(m.passRate) }),
         el('td', { class: 'num', text: fmtDuration(m.avgMs) }),
-        el('td', { class: 'num nowrap', text: run.cost?.totalUsd !== null && run.cost?.totalUsd !== undefined ? `${run.cost.estimated ? '≈ ' : ''}${fmtUsd(run.cost.totalUsd)}` : '—' }),
+        el('td', { class: 'num nowrap', text: run.cost?.totalUsd !== null && run.cost?.totalUsd !== undefined ? `${run.cost.estimated ? '≈ ' : ''}${fmtUsd(run.cost.totalUsd)}` : run.cost?.unpriced ? 'n/a' : '—' }),
         el('td', { class: 'num', text: `${reviewed}/${run.cases.length}` }),
       );
     });
@@ -773,10 +776,12 @@ export function createDashboard({ host, api, icon, onOpenRun, onOpenCase }) {
       }),
       tile({
         label: 'Cost',
-        value: now.costUsd === null ? '—' : `${now.costEstimated ? '≈ ' : ''}${fmtUsd(now.costUsd)}`,
+        value: now.costUsd === null ? (runs.some((run) => run.cost?.unpriced) ? 'n/a' : '—') : `${now.costEstimated ? '≈ ' : ''}${fmtUsd(now.costUsd)}`,
         sub: now.costedRuns
           ? `${fmtUsd(now.costPerRun)} per run · ${fmtUsd(now.costPerCase)} per case${now.costedRuns < runs.length ? ` · ${runs.length - now.costedRuns} run${runs.length - now.costedRuns > 1 ? 's' : ''} without usage` : ''}`
-          : 'No usage recorded yet',
+          : runs.some((run) => run.cost?.unpriced)
+            ? 'No price for the models used (.qa/config.json → pricing)'
+            : 'No usage recorded yet',
         delta: delta(now.costUsd, before.costUsd, { kind: 'usd', upIsGood: false }),
         iconName: 'cost',
       }),

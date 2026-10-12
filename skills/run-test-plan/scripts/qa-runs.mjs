@@ -2,8 +2,14 @@
 // run-test-plan CLI. One entry point for the orchestrator and the Test Agents:
 //
 //   init <plan.json> [--label txt] [--record] [--only TC-1,TC-2] [--retest <runId>]
+//        [--harness claude-code|codex|cursor|gemini|opencode|copilot|generic] [--check]
 //        Freeze the plan into a new run folder, write one brief per test case, and schedule
-//        batches (tier, model, effort) in schedule.json.
+//        batches (tier, model, effort) in schedule.json for the agent harness running it.
+//        --check only validates the plan and writes nothing.
+//   doctor [--harness name] [--browser]
+//                             What this machine and project still need (Node, npx, ffmpeg,
+//                             .gitignore, harness) and how to register the browser server;
+//                             --browser also starts Playwright MCP once.
 //   open [runId]              Start the viewer server if needed and open it in the browser.
 //   serve                     Run the viewer server in the foreground.
 //   mark <runId> <tcId> <running|pending> [note]
@@ -22,10 +28,13 @@
 //   next <runId> [--release <batch>] [--fallback]
 //                             The batches to launch now (agent, model, effort, prompt), after
 //                             escalating cheap-model verdicts that need a second look.
-//   usage <runId> --batch B (--transcript <agent output file> | --tokens N [--model sonnet])
-//         [--tool-uses N] [--ms N]   (--group G instead of --batch for runs without a schedule)
-//                             Record what a batch cost and mark it done; no source = summary
-//                             (--profile: where the run's tokens went, by tool).
+//   usage <runId> --batch B [--transcript <agent output file> | --input N --output N [--cached N]
+//         | --tokens N] [--model m] [--tool-uses N] [--ms N]
+//                             (--group G instead of --batch for runs without a schedule)
+//                             Record what a batch cost (n/a when the harness reports nothing or
+//                             the model has no price), save its passing cases as library scripts
+//                             (from the transcript, else the browser proxy's log) and mark it
+//                             done; no batch or source = summary (--profile: tokens by tool).
 //   profile <transcript.jsonl…>  Where agents' tokens went, by tool, from transcripts.
 //
 // Test library and deterministic runs (references/library.md):
@@ -60,14 +69,18 @@ import {
 } from './memory.mjs';
 import { answerQuestion, askQuestion, openQuestions, readQuestions, waitForAnswer } from './questions.mjs';
 import { PRICING_AS_OF, costOf } from './pricing.mjs';
+import { doctor as runDoctor } from './doctor.mjs';
+import { resolveHarness } from './harness.mjs';
 import { buildSchedule, escalate, execution, finishBatch, nextLaunch, readSchedule, saveSchedule } from './schedule.mjs';
 import { executeRun, prepareSuiteRun } from './replay.mjs';
-import { mergeProfiles, parseTranscript, recordUsage, runCost } from './usage.mjs';
+import { browserProfile, mergeProfiles, parseTranscript, recordUsage, runCost } from './usage.mjs';
 import {
   captureCode,
   cleanTags,
   deleteSuite,
+  extractFromBrowserLog,
   extractScripts,
+  extractScriptsFromLog,
   listSuites,
   listTests,
   readSuite,
@@ -119,6 +132,7 @@ async function init(planArg = args[0], opts = flags) {
   if (!plan || plan.__parseError) fail(`plan is not valid JSON: ${plan?.__parseError}`);
   const problems = checkPlan(plan);
   if (problems.length) fail(`plan has problems:\n- ${problems.join('\n- ')}`);
+  if (opts.check) return console.log(`OK plan ${plan.id}: ${plan.testCases.length} test case(s), no problems`);
 
   let selected = plan.testCases;
   if (opts.only) {
@@ -180,7 +194,13 @@ async function init(planArg = args[0], opts = flags) {
     );
   }
   const secrets = [...new Set(briefed.filter((e) => e.secretRef).map((e) => e.secretRef))];
-  const schedule = buildSchedule(frozen, selected, caseHistories(plan.id, runId));
+  let harness;
+  try {
+    harness = resolveHarness(opts.harness);
+  } catch (error) {
+    fail(error.message);
+  }
+  const schedule = buildSchedule(frozen, selected, caseHistories(plan.id, runId), harness);
   saveSchedule(runId, schedule);
 
   console.log(`OK run=${runId}`);
@@ -188,9 +208,10 @@ async function init(planArg = args[0], opts = flags) {
   console.log(`viewer=http://127.0.0.1:${PORT}/#/run/${encodeURIComponent(runId)}`);
   for (const b of schedule.batches)
     console.log(
-      `batch ${b.id}: ${b.cases.join(', ')}  ${b.tier} → ${b.model}/${b.effort}  (${b.cases.map((id) => schedule.cases[id].reasons.join(', ')).join('; ')})`,
+      `batch ${b.id}: ${b.cases.join(', ')}  ${b.tier} → ${b.model || 'session model'}/${b.effort}  (${b.cases.map((id) => schedule.cases[id].reasons.join(', ')).join('; ')})`,
     );
-  const ex = execution();
+  console.log(`harness: ${harness}${harness === 'claude-code' ? '' : ' (one Test Agent at a time on the shared qa-browser server)'}`);
+  const ex = execution(harness);
   const logins = ex.accounts.length || new Set(schedule.batches.map((b) => b.user)).size;
   const parallel = Math.min(schedule.maxParallel, schedule.batches.length, schedule.sessions === 'shared' ? Infinity : logins);
   console.log(
@@ -243,8 +264,11 @@ function caseHistories(planId, exceptRunId) {
 
 // Capabilities are project skills. Test Agents get their file path, not a Skill tool whose
 // listing of every installed skill would ride along on every turn.
+// Every folder an agent harness installs skills into, project first, then the user's.
+const SKILL_DIRS = ['.agents', '.claude', '.cursor', '.gemini', '.opencode', '.github', '.codex'];
 function capabilityPath(skill) {
-  for (const dir of [join(PROJECT_ROOT, '.claude', 'skills'), join(homedir(), '.claude', 'skills')]) {
+  const roots = [PROJECT_ROOT, homedir()];
+  for (const dir of roots.flatMap((root) => SKILL_DIRS.map((d) => join(root, d, 'skills')))) {
     const file = join(dir, skill, 'SKILL.md');
     if (existsSync(file)) return repoPath(file);
   }
@@ -526,10 +550,13 @@ function next() {
       if (step.kind === 'done') return console.log(`DONE every batch finished. Next: $Q validate ${runId}`);
       if (step.kind === 'wait')
         return console.log(`WAIT ${step.running.map((b) => b.id).join(', ')} running${step.why ? ` (${step.why})` : ''}. Run next again when one notifies.`);
-      const { batch, prompt } = step;
+      const { batch, prompt, harness } = step;
       const secret = batch.account?.secret;
+      // Claude Code's Agent tool takes these fields verbatim; other harnesses read references/harness/<name>.md.
       console.log(
-        `LAUNCH ${batch.id}  subagent_type=${batch.agent}  model=${batch.model}  effort=${batch.effort}  run_in_background=true  cases=${batch.cases.join(',')}`,
+        harness === 'claude-code'
+          ? `LAUNCH ${batch.id}  subagent_type=${batch.agent}  model=${batch.model}  effort=${batch.effort}  run_in_background=true  cases=${batch.cases.join(',')}`
+          : `LAUNCH ${batch.id}  harness=${harness}  agent=${batch.agent}  model=${batch.model || 'session'}  effort=${batch.effort}  cases=${batch.cases.join(',')}`,
       );
       if (secret?.startsWith('env:'))
         console.log(`  replace {{PASSWORD ${secret}}} with that variable's value (${process.env[secret.slice(4)] ? 'set' : 'NOT set: ask the human'})`);
@@ -645,7 +672,8 @@ function usage() {
   const runId = args[0];
   if (!runId || !existsSync(runDir(runId))) fail('usage needs a run id.');
   const run = loadRun(runId);
-  if (flags.transcript || flags.tokens) {
+  const split = flags.input || flags.output ? { input: flags.input, output: flags.output, cacheRead: flags.cached } : null;
+  if (flags.batch || flags.group || flags.transcript || flags.tokens || split) {
     const batch = flags.batch ? readSchedule(runId)?.batches.find((b) => b.id === flags.batch) : null;
     if (flags.batch && !batch) fail(`unknown batch ${flags.batch}`);
     const group = batch?.id || flags.group || null;
@@ -657,29 +685,40 @@ function usage() {
         ? run.testCases.filter((tc) => (tc.group || tc.id) === group).map((tc) => tc.id)
         : [];
     if (group && !cases.length) fail(`no test case belongs to group "${group}"`);
+    const transcript = flags.transcript ? resolve(String(flags.transcript)) : null;
+    // Without a transcript, the browser proxy's log is the record of what the agent did.
+    let fromLog = null;
+    if (!transcript && batch)
+      try {
+        fromLog = extractFromBrowserLog(run, cases, batch);
+      } catch {
+        fromLog = null;
+      }
     try {
       for (const e of recordUsage(runId, {
         group,
         cases,
-        transcript: flags.transcript ? resolve(String(flags.transcript)) : null,
+        transcript,
         tokens: flags.tokens,
+        split,
         model: flags.model || batch?.model,
         effort: flags.effort || batch?.effort,
         tier: flags.tier || batch?.tier,
         toolUses: flags['tool-uses'] ? Number(flags['tool-uses']) : null,
         durationMs: flags.ms ? Number(flags.ms) : null,
+        profile: fromLog?.calls.length ? browserProfile(fromLog.calls) : null,
       }))
         console.log(
-          `OK ${group || 'run'} ${e.model} ${(e.totalTokens ?? e.reportedTokens).toLocaleString('en-US')} tokens${e.totalTokens ? '' : ' (reported)'} ${usd(e.costUsd)}${e.estimated ? ` (estimated: ${e.rateSource || 'unknown price'})` : ''} [${e.source}]${e.profile ? `  ${profileLine(e.profile)}` : ''}`,
+          `OK ${group || 'run'} ${e.model} ${e.source === 'not reported' ? 'no usage reported' : `${(e.totalTokens ?? e.reportedTokens).toLocaleString('en-US')} tokens${e.totalTokens ? '' : ' (reported)'}`} ${usd(e.costUsd)}${e.estimated || e.rateSource ? ` (${e.estimated ? 'estimated: ' : ''}${e.rateSource || 'unknown price'})` : ''} [${e.source}]${e.profile ? `  ${profileLine(e.profile)}` : ''}`,
         );
-      // The same transcript holds the Playwright code the agent ran: passing cases become
-      // replayable scripts in the test library.
-      if (flags.transcript && existsSync(resolve(String(flags.transcript))))
-        try {
-          for (const line of extractScripts(loadRun(runId), cases, resolve(String(flags.transcript)), batch)) console.log(line);
-        } catch (error) {
-          console.log(`! scripts not saved: ${error.message}`);
-        }
+      // What the agent ran in the browser: passing cases become replayable scripts in the test
+      // library. A Claude Code transcript holds it; for every other harness, the proxy's log.
+      try {
+        if (transcript && existsSync(transcript)) for (const line of extractScripts(loadRun(runId), cases, transcript, batch)) console.log(line);
+        else if (!transcript && batch) for (const line of extractScriptsFromLog(loadRun(runId), cases, batch)) console.log(line);
+      } catch (error) {
+        console.log(`! scripts not saved: ${error.message}`);
+      }
       if (batch) finishBatch(runId, batch.id, 'done');
     } catch (error) {
       fail(error.message);
@@ -690,16 +729,18 @@ function usage() {
   if (flags.profile) return printProfile(cost.profile);
   console.log(`${runId}  total ${usd(cost.totalUsd)}${cost.estimated ? ' (partly estimated)' : ''}  agents ${usd(cost.agentsUsd)}  chat ${usd(cost.chatUsd)} (${cost.chatTurns} turns)  list prices as of ${PRICING_AS_OF}`);
   for (const e of cost.entries)
-    console.log(`  ${String(e.group || '-').padEnd(10)} ${e.model.padEnd(18)} ${String(e.totalTokens ?? `${e.reportedTokens} rep.`).padStart(14)} tokens  ${usd(e.costUsd)}${e.estimated ? ' est.' : ''}`);
+    console.log(`  ${String(e.group || '-').padEnd(10)} ${e.model.padEnd(18)} ${String(e.totalTokens ?? (e.reportedTokens ? `${e.reportedTokens} rep.` : 'n/a')).padStart(14)} tokens  ${usd(e.costUsd)}${e.estimated ? ' est.' : ''}`);
   if (cost.missingGroups.length) console.log(`  ! no usage recorded for group(s): ${cost.missingGroups.join(', ')}`);
 }
 
 const kTokens = (n) => (n === null || n === undefined ? 'n/a' : `${Math.round(n / 1000)}K`);
 const profileLine = (p) =>
-  `turns=${p.turns} context first=${kTokens(p.firstContext)} peak=${kTokens(p.peakContext)} snapshots=${p.snapshots} imageReads=${p.imageReads}`;
+  p.turns === null
+    ? `browser calls=${Object.values(p.tools).reduce((sum, t) => sum + t.calls, 0)} snapshots=${p.snapshots} (from the browser log)`
+    : `turns=${p.turns} context first=${kTokens(p.firstContext)} peak=${kTokens(p.peakContext)} snapshots=${p.snapshots} imageReads=${p.imageReads}`;
 
 function printProfile(p) {
-  if (!p) return console.log('no profile: record groups with --transcript');
+  if (!p) return console.log('no profile: record batches with usage --batch');
   console.log(`${p.agents ? `agents=${p.agents} ` : ''}${profileLine(p)}`);
   const tools = Object.entries(p.tools).sort((a, b) => b[1].resultChars - a[1].resultChars);
   const total = tools.reduce((sum, [, t]) => sum + t.resultChars, 0) || 1;
@@ -955,12 +996,21 @@ async function heal() {
   };
   const planFile = join(runDir(runId), `heal-${tcId}.plan.json`);
   writeJson(planFile, plan);
-  const healId = await init(planFile, { only: tcId, label: `Repair ${name}`, heal: runId, record: tc.record });
-  console.log(`NEXT in Claude Code: "run-test-plan: execute run ${healId}, already initialized (references/execute.md, from \`next\`)"`);
+  const healId = await init(planFile, { only: tcId, label: `Repair ${name}`, heal: runId, record: tc.record, harness: flags.harness || readSchedule(runId)?.harness });
+  console.log(`NEXT in your agent: "run-test-plan: execute run ${healId}, already initialized (references/execute.md, from \`next\`)"`);
+}
+
+async function doctor() {
+  const checks = await runDoctor({ harness: flags.harness, browser: Boolean(flags.browser) });
+  for (const { ok, label, fix } of checks) {
+    console.log(`${ok === true ? 'OK  ' : ok === false ? 'FIX ' : '--  '}${label}`);
+    if (fix) console.log(fix.replace(/^/gm, '      '));
+  }
+  if (checks.some((c) => c.ok === false)) process.exit(1);
 }
 
 // Dispatch last, so every function and constant above is initialized before a command runs.
-const commands = { init: () => init(), open, serve, mark, next, validate, status, latest, annotate, ask, answer, questions, memory, usage, profile, tests, suite, replay, heal };
+const commands = { init: () => init(), doctor, open, serve, mark, next, validate, status, latest, annotate, ask, answer, questions, memory, usage, profile, tests, suite, replay, heal };
 if (!commands[command]) {
   console.log(
     readFileSync(new URL(import.meta.url), 'utf8')

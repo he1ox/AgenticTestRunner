@@ -1,7 +1,9 @@
 // List prices in USD per million tokens, from Anthropic's published API pricing as of the date
 // below. Costs computed from them are API list-price equivalents: a subscription or enterprise
 // agreement bills differently, so treat them as a consistent yardstick, not an invoice.
-// Override or extend per project in .qa/config.json → pricing.
+// Override or extend per project in .qa/config.json → pricing, e.g. for another provider's models:
+//   "pricing": { "gpt-5.4": { "input": 1.25, "output": 10, "cacheRead": 0.125 } }
+// A model with no price here or there costs null ("n/a"): it is never priced as another model.
 import { CONFIG } from './lib.mjs';
 
 export const PRICING_AS_OF = '2026-10-06';
@@ -27,7 +29,11 @@ const BASE = {
 const ALIASES = { sonnet: 'claude-sonnet-5-5', opus: 'claude-opus-5-5', haiku: 'claude-haiku-5-5', fable: 'claude-fable-5-1' };
 
 export function priceFor(model) {
-  const id = ALIASES[model] || String(model || '').replace(/\[.*\]$/, '').replace(/-\d{8}$/, '');
+  if (!model || model === 'unknown' || model === 'session') return null;
+  // OpenCode and others name models provider/model: a price may be keyed by either form.
+  const raw = String(model).replace(/\[.*\]$/, '').replace(/-\d{8}$/, '');
+  const short = raw.includes('/') ? raw.slice(raw.lastIndexOf('/') + 1) : raw;
+  const id = ALIASES[model] || (CONFIG.pricing?.[raw] || BASE[raw] ? raw : short);
   const base = { ...BASE[id], ...CONFIG.pricing?.[id] };
   if (base.input === undefined || base.output === undefined) return null;
   return { id, ...rates(base), ...(base.long && { long: { above: base.long.above, ...rates(base.long) } }) };

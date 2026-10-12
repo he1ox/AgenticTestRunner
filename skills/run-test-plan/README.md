@@ -4,7 +4,7 @@
 
 ## What it does
 
-The skill turns a test ticket or test plan into `.qa/plans/<KEY>.plan.json`, asks you to approve the case list, then schedules batches of cases with a model and effort each (Haiku for short read-only cases, Sonnet for the rest; Haiku failures are re-checked on Sonnet) and launches Playwright-driven Test Agents, several at once when the qa-runner plugin's browser pool and enough test accounts are available. Agents write a result and evidence (screenshots, optional video) per case. A local viewer at `http://127.0.0.1:4321` shows live progress, a dashboard (pass rate, blocked cases, agent time, cost per run), screenshot annotations, and Approve / Needs retest / Reject buttons. `validate` checks every result for missing evidence and leaked credentials before anyone trusts a verdict. Agents can ask you questions through the viewer; approved answers are remembered for later runs (secrets only as `env:NAME` references).
+The skill turns a test ticket or test plan into `.qa/plans/<KEY>.plan.json`, asks you to approve the case list, then schedules batches of cases with a tier and effort each (in Claude Code: Haiku for short read-only cases, Sonnet for the rest, Haiku failures re-checked on Sonnet) and launches Playwright-driven Test Agents through your agent's own subagents, or runs them inline when it has none. With the Claude Code plugin's browser pool and enough test accounts, several run at once. Agents write a result and evidence (screenshots, optional video) per case. A local viewer at `http://127.0.0.1:4321` shows live progress, a dashboard (pass rate, blocked cases, agent time, cost per run), screenshot annotations, and Approve / Needs retest / Reject buttons. `validate` checks every result for missing evidence and leaked credentials before anyone trusts a verdict. Agents can ask you questions through the viewer; approved answers are remembered for later runs (secrets only as `env:NAME` references).
 
 ## When to use it
 
@@ -39,8 +39,9 @@ Run the test cases for SHOP-42 on QA, with recording
 
 ## Setup
 
+- Any agent that runs shell commands: Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Copilot CLI… (`references/harness/`)
 - Node.js 20+ (no npm dependencies)
-- Browsers: the [qa-runner plugin](https://github.com/he1ox/AgenticTestRunner) brings its own pool of three isolated browsers and dedicated Test Agents (parallel runs). This folder alone also works, one agent at a time, with a Playwright MCP server registered as `playwright`: `claude mcp add playwright -- npx @playwright/mcp@0.0.82`
+- A browser server: installed as a plugin or extension it comes registered; otherwise `node scripts/qa-runs.mjs doctor --harness <yours>` prints the one command to register it (the **qa-setup** skill walks you through it)
 - `ffmpeg` on the PATH, only for recordings
 - Optional per-project settings in `.qa/config.json` (see `schemas/config.schema.json`). Add `.qa/runs/` to `.gitignore`.
 - Credentials are never stored: pass them in the agent prompt or as `env:NAME` references.
@@ -48,15 +49,12 @@ Run the test cases for SHOP-42 on QA, with recording
 ## Installation
 
 ```bash
-claude plugin marketplace add he1ox/AgenticTestRunner
+npx skills add he1ox/AgenticTestRunner
 ```
 
-```bash
-claude plugin install qa-runner@AgenticTestRunner
-```
-
-Then call it as `/qa-runner:run-test-plan`, or copy the folder into a project:
-`cp -r skills/run-test-plan .claude/skills/`
+That installs this skill and its companions (`qa-setup`, `write-test-plan`, `replay-test-plan`)
+for the agents it detects. Plugin installs per agent are in the
+[repository README](https://github.com/he1ox/AgenticTestRunner#install).
 
 Source and issues: https://github.com/he1ox/AgenticTestRunner
 
@@ -65,6 +63,6 @@ Source and issues: https://github.com/he1ox/AgenticTestRunner
 | Field | Value |
 |-------|-------|
 | Author | @jorgeebits |
-| Version | 0.5.0 |
-| Last updated | 2026-10-06 |
+| Version | 0.8.0 |
+| Last updated | 2026-10-11 |
 | Target Project | Any web app — QA / non-prod |

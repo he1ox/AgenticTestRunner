@@ -893,7 +893,7 @@ function applyTheme(theme) {
   $('#theme').setAttribute('aria-label', theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
 }
 
-// Prepares a Test Agent run of one failed replay case; launching the agent stays with Claude Code.
+// Prepares a Test Agent run of one failed replay case; launching the agent stays with the human's agent session.
 async function heal(tcId, button) {
   button.disabled = true;
   try {
@@ -913,7 +913,7 @@ async function heal(tcId, button) {
 $('#heal-copy').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText($('#heal-prompt').value);
-    toast('Copied: paste it in Claude Code');
+    toast('Copied: paste it in your agent session');
   } catch {
     $('#heal-prompt').select();
   }
@@ -922,7 +922,7 @@ $('#heal-run').addEventListener('click', () => $('#heal-panel').close());
 
 function showError(error) {
   $('#detail').innerHTML =
-    `<div class="callout">${icon('warn')}<div><strong>Could not reach the viewer server</strong>${esc(error.message)}<br />Run <code>node .claude/skills/run-test-plan/scripts/qa-runs.mjs open</code>.</div></div>`;
+    `<div class="callout">${icon('warn')}<div><strong>Could not reach the viewer server</strong>${esc(error.message)}<br />Run <code>node &lt;skills folder&gt;/run-test-plan/scripts/qa-runs.mjs open</code> from the project (the skills folder is <code>.agents/skills</code>, <code>.claude/skills</code> or your agent's own).</div></div>`;
   clearTimeout(state.timer);
   state.timer = setTimeout(() => loadRun({ force: true }).catch(showError), 5000);
 }
