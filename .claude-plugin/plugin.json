@@ -1,6 +1,6 @@
 {
   "name": "qa-runner",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Run manual-style E2E test plans with browser agents in any coding agent (Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Copilot), review the evidence in a local viewer, and retest what a human rejects.",
   "author": {
     "name": "jorge.lopezg"

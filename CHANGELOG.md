@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 — 2026-10-11
+
+From sign-off to pipeline: approved cases gate CI and export as Playwright code.
 
 - **CI mode for Test plans.** `suite run <id> --ci` (and `replay <runId> --ci`) replays
   headless with no viewer window and no agent, prints one line per case and the totals, and

@@ -5,7 +5,7 @@ license: MIT
 compatibility: Part of qa-runner; needs the run-test-plan skill installed alongside. Node.js 20+, npx; ffmpeg only for recordings.
 metadata:
   author: jorge.lopezg
-  version: "0.8.0"
+  version: "0.9.0"
 ---
 
 # QA Setup

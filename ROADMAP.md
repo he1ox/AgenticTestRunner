@@ -24,6 +24,18 @@
   `gemini -p`, `opencode run`, `copilot -p`), chosen by `harness`; disabled with a reason when
   the harness has none.
 
+## Done (0.9.0): from sign-off to pipeline
+
+- **CI mode.** `suite run <id> --ci` (and `replay <runId> --ci`) replays headless with no
+  viewer or agent, writes JUnit (`--junit`), and exits 1 on a `--fail-on` status, 2 when the
+  run cannot start. Example GitHub Actions workflow in `examples/ci/qa-replay.yml`.
+- **Export to Playwright.** `qa-runs export` writes library scripts as Playwright Test files:
+  login in `beforeEach` from `process.env`, steps as `test.step`, marks as `toBeVisible()`,
+  the rest as `// TODO(qa-runner)`. Also from the viewer's Tests view.
+
+Next: translate more capture kinds into assertions (text, values) so exports need fewer TODOs,
+and run the example workflow on a real project.
+
 ## Done (0.1.0)
 
 - **Phase 0, baseline.** Context the skill loads at start, measured at about 4 bytes/token:

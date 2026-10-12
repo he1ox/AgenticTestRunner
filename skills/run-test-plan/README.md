@@ -63,6 +63,6 @@ Source and issues: https://github.com/he1ox/AgenticTestRunner
 | Field | Value |
 |-------|-------|
 | Author | @jorgeebits |
-| Version | 0.8.0 |
+| Version | 0.9.0 |
 | Last updated | 2026-10-11 |
 | Target Project | Any web app — QA / non-prod |
