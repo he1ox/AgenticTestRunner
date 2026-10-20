@@ -15,7 +15,10 @@ need it: they read `skills/*/SKILL.md`.
 - `claude/agents/`, `.claude-plugin/`, `plugin.json` + `mcp.json` (Agent Plugins 1.0),
   `.codex-plugin/`, `.agents/plugins/`, `gemini-extension.json` — packaging per harness. All but
   the metadata in `.claude-plugin/plugin.json` are **generated**.
-- `examples/.qa/` — a complete project config, plan and memory, used by CI.
+- `examples/.qa/` — a complete project config, plan and memory, used by CI and the tests.
+- `test/` — the `node:test` suite (`node --test`). Import `./setup-project.mjs` first in every
+  test file: it points the scripts at a temporary copy of `examples/.qa`.
+- `scripts/check.mjs` — every check CI runs, in one command.
 
 ## Rules
 
@@ -35,9 +38,13 @@ need it: they read `skills/*/SKILL.md`.
 ## Before you open a PR
 
 ```bash
-node scripts/validate-skills.mjs
-node scripts/build.mjs --check
+node scripts/check.mjs
 ```
+
+It validates the skills, checks generated files, parses every script and JSON file and runs the
+tests; CI runs the same on Linux, Windows and macOS with Node 20, 22 and 24. Add or update tests
+in `test/` for behavior you change. PR titles follow Conventional Commits (`type(scope): summary`);
+a check enforces it. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Then install from your checkout into a scratch project and run the example plan with the
 harness you changed: `npx skills add <path-to-checkout> -a <agent> --copy`.

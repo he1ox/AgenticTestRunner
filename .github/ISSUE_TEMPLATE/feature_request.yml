@@ -1,0 +1,47 @@
+name: Feature request
+description: Suggest something qa-runner should do, or do differently.
+labels: [enhancement, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [roadmap](https://github.com/he1ox/AgenticTestRunner/blob/main/ROADMAP.md) first.
+        Open-ended ideas and questions fit better in [Discussions](https://github.com/he1ox/AgenticTestRunner/discussions).
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to test or review, and what gets in the way today?
+      placeholder: When a release has 40 cases I review them one by one; I want to approve every passing case at once.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: The behavior you have in mind, as a user would see it (command, prompt or viewer).
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: dropdown
+    id: harness
+    attributes:
+      label: Does it depend on one agent harness?
+      options:
+        - No, every harness
+        - Claude Code
+        - Codex
+        - Cursor
+        - Gemini CLI
+        - OpenCode
+        - GitHub Copilot CLI
+        - Other
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I would like to open a pull request for this.

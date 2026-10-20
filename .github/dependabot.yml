@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # qa-runner has no npm dependencies; the actions in .github/workflows are its only ones.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: ci
+    labels: [dependencies]

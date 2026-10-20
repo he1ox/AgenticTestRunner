@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/he1ox/AgenticTestRunner/discussions
+    about: Ask how to do something, share a plan, or discuss an idea before it is a feature request.
+  - name: Security vulnerability
+    url: https://github.com/he1ox/AgenticTestRunner/security/advisories/new
+    about: Report it privately, never in a public issue. See SECURITY.md.

@@ -1,0 +1,12 @@
+# LF everywhere, also in Windows checkouts: generated files are compared byte for byte by
+# `node scripts/build.mjs --check`, and CI runs on Windows too.
+* text=auto eol=lf
+
+*.png  binary
+*.jpg  binary
+*.gif  binary
+*.webp binary
+*.mp4  binary
+*.webm binary
+*.ico  binary
+*.woff2 binary

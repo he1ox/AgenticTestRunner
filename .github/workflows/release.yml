@@ -1,0 +1,52 @@
+name: release
+
+# Push a tag vX.Y.Z after `node scripts/bump-version.mjs X.Y.Z` is merged: this checks the tag
+# matches the plugin version, runs every check, and publishes a GitHub release whose notes are
+# that version's section of CHANGELOG.md.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Tag matches the plugin version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(node -p "require('./.claude-plugin/plugin.json').version")
+          [ "$TAG" = "v$version" ] || { echo "::error::tag $TAG does not match plugin version $version"; exit 1; }
+
+      - name: All checks
+        run: node scripts/check.mjs
+
+      - name: Notes from CHANGELOG.md
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="${TAG#v}"
+          awk -v v="$version" '
+            /^## / { if (found) exit; if (index($0, "## " v " ") == 1 || $0 == "## " v) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "::error::CHANGELOG.md has no section for $version"; exit 1; }
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --notes-file notes.md --verify-tag

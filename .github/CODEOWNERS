@@ -1,0 +1,8 @@
+# Reviewers GitHub requests automatically. Add maintainers here as the project grows; a path
+# listed later wins over an earlier one.
+*                    @he1ox
+
+# Release, CI and packaging decide what every user installs.
+/.github/            @he1ox
+/scripts/            @he1ox
+/.claude-plugin/     @he1ox
