@@ -112,3 +112,13 @@ Peso objetivo: `site/` por debajo de 80 KB sin fuentes. No se copian los GIFs de
 - `node scripts/validate-skills.mjs` y `node scripts/build.mjs --check` siguen en verde.
 - `node scripts/bump-version.mjs 0.9.0` termina sin el error "version not found". Revertir con git si cambia algo.
 - Validar el YAML del workflow. El deploy real se ve en Actions después del merge.
+
+## Update: § 03 insights and replays (2026-10-19)
+
+A third animation, approved after the first PR draft, becomes a new dark § 03 "Your feedback compounds", in four scenes taken from the real viewer:
+1. **Insights:** the dashboard's KPIs count up, then the real cards appear with a pink reading each: *Cases that need attention* (TC-07 flip-flops), *Outcomes by device* (mobile fails 4× more), *Slowest cases*, *Where agent context goes*. You open TC-07.
+2. **Ask the agent:** *Chat with your agent* on TC-07. The agent explains that a toast covered Pay, marks it on the screenshot when asked and proposes a lesson.
+3. **Replay a Test plan:** you name "Release 1.0.1", tag it, pick tests, save and Run. Every script replays as *Deterministic*: 6 passed, $0.00, 0 tokens, and the same plan gates CI.
+4. **Your feedback compounds:** over 6 runs, questions to you fall 5→0, reviewer agreement rises 72→97% and approved memories grow 0→9. The copy says agents *read approved memory*, not that they are trained.
+
+To avoid repeating it, § 02 drops its dashboard scene (now three scenes) and the $0 section becomes a compact § 04 band. Compare is § 05 and install is § 06.

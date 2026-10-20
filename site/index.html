@@ -25,6 +25,7 @@
     <nav aria-label="Sections">
       <a href="#watch">Evidence</a>
       <a href="#signoff">Sign-off</a>
+      <a href="#smarter">Insights</a>
       <a href="#replays">Replays</a>
       <a href="#install">Install</a>
     </nav>
@@ -82,13 +83,11 @@
           <li><b>01</b> Answer once</li>
           <li><b>02</b> Review every verdict</li>
           <li><b>03</b> Approve what agents learn</li>
-          <li><b>04</b> See how agents are doing</li>
         </ol>
       </div>
       <figure class="stage stage-light">
         <figcaption class="stagebar mono">
-          <span data-label>01 / 04 · answer once</span>
-          <span class="example">example data</span>
+          <span data-label>01 / 03 · answer once</span>
           <button class="replay" data-replay>Replay</button>
         </figcaption>
         <div class="hitl" aria-hidden="true">
@@ -99,12 +98,36 @@
           </div>
         </div>
         <p class="caption mono" data-caption aria-hidden="true"></p>
-        <p class="sr-only">Animation: an agent asks which account can approve a refund; you answer and tick Remember, and the answer is saved as a memory with the password as an env:NAME reference. You approve three results and reject one, and only that case is retested. You approve one lesson an agent learned and discard another. A dashboard shows pass rate, failures, agent time per case, reviewer agreement, and cost and questions per run falling to zero as approved cases replay.</p>
+        <p class="sr-only">Animation: an agent asks which account can approve a refund; you answer and tick Remember, and the answer is saved as a memory with the password as an env:NAME reference. You approve three results and reject one, and only that case is retested. You approve one lesson an agent learned and discard another, and it is saved to memory.</p>
+      </figure>
+    </section>
+
+    <section id="smarter" class="dark section">
+      <div class="head grid12">
+        <p class="tag">§ 03 · insights and replays</p>
+        <h2 class="display">Your feedback <span class="acid">compounds.</span></h2>
+        <p class="lede">The dashboard shows where to look. The chat explains what an agent saw. Approved cases become Test plans that replay with no agent. And every answer, verdict and lesson you approve is read by the agents before the next run.</p>
+        <ol class="steps steps-dark mono" data-steps>
+          <li><b>01</b> Read the insights</li>
+          <li><b>02</b> Ask the agent</li>
+          <li><b>03</b> Replay a Test plan</li>
+          <li><b>04</b> Watch it compound</li>
+        </ol>
+      </div>
+      <figure class="stage stage-dark">
+        <figcaption class="stagebar mono">
+          <span data-label class="acid">01 / 04 · insights</span>
+          <span class="example">example data</span>
+          <button class="replay" data-replay>Replay</button>
+        </figcaption>
+        <div class="dviewer" data-viewer aria-hidden="true"></div>
+        <p class="caption mono" data-caption aria-hidden="true"></p>
+        <p class="sr-only">Animation: the dashboard surfaces insights — a case that flip-flops between runs, mobile failing four times more than desktop, the slowest flows and where agent context goes. You open the unstable case and ask the agent why it failed; it explains a toast covered the Pay button, marks it on the screenshot and proposes a lesson. You build a Test plan called Release 1.0.1 from library tests and run it: every script replays deterministically, with no agent, at $0 and 0 tokens. Over six runs, questions to you fall from five to zero and reviewer agreement rises from 72% to 97% as approved memories grow.</p>
       </figure>
     </section>
 
     <section id="replays" class="dark section grid12 replays">
-      <p class="tag">§ 03 · replays, CI and export</p>
+      <p class="tag">§ 04 · replays, CI and export</p>
       <div class="zero">
         <p class="big acid" aria-label="Zero dollars">$0</p>
         <p class="lede">per replay. Every case you approve is saved as a script that replays later in its own headless browser, with no agent and no tokens. Same steps, same marked screenshots, same recording.</p>
@@ -123,7 +146,7 @@
 
     <section id="compare" class="light section">
       <div class="head grid12">
-        <p class="tag">§ 04 · how it compares</p>
+        <p class="tag">§ 05 · how it compares</p>
         <h2 class="display">Starts earlier. Ends with your signature.</h2>
       </div>
       <div class="tablewrap">
@@ -144,7 +167,7 @@
 
     <section id="install" class="light section rule">
       <div class="head grid12">
-        <p class="tag">§ 05 · install</p>
+        <p class="tag">§ 06 · install</p>
         <h2 class="display">One command for any agent.</h2>
         <p class="lede">Or install the plugin for your agent, which also registers the browser. Pick one, not both, or every skill shows up twice.</p>
       </div>
