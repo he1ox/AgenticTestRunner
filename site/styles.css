@@ -88,14 +88,15 @@ mark { background: var(--acid); color: var(--ink); padding: 0 .12em; -webkit-box
 .stagebar .example { margin-left: auto; opacity: .55; }
 .replay { background: transparent; color: inherit; border: 1px solid currentColor; padding: 4px 10px; font-family: var(--mono); font-size: 12px; }
 .replay:hover { background: var(--acid); color: var(--ink); border-color: var(--ink); }
-.scene { min-height: 330px; }
+.scene { min-height: 330px; position: relative; }
 
 /* animation primitives */
 .win { border: 1px solid var(--line-dark); background: var(--paper); color: var(--ink); border-radius: 6px; overflow: hidden; }
 .ub { background: var(--paper-2); font-size: 12px; padding: 5px 8px; border-bottom: 1px solid #ccc; color: #555; }
-.cur { position: absolute; left: 12px; top: 12px; transition: left .6s ease, top .6s ease; pointer-events: none; z-index: 3; display: flex; align-items: flex-start; }
-.cur .who { position: absolute; left: 12px; top: 14px; font-family: var(--mono); font-size: 11px; padding: 1px 5px; white-space: nowrap; }
-.cur.flip .who { left: auto; right: 10px; }
+.cur { position: absolute; left: 12px; top: 12px; transition: left .6s ease, top .6s ease, opacity .3s; pointer-events: none; z-index: 3; display: flex; align-items: flex-start; }
+.cur.off { opacity: 0; }
+.cur .who { position: absolute; left: 12px; top: 14px; font-family: var(--mono); font-size: 11px; padding: 1px 5px; white-space: nowrap; transition: transform .6s ease; }
+.cur.flip .who { transform: translateX(calc(-100% - 6px)); }
 .cur.agent .who { background: var(--acid); color: var(--void); }
 .cur.human .who { background: var(--hot); color: #fff; }
 .fl { position: absolute; inset: 0; background: #fff; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 4; }
@@ -177,8 +178,8 @@ mark { background: var(--acid); color: var(--ink); padding: 0 .12em; -webkit-box
 .insights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
 .ih { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 5px; }
 .ins { font-family: var(--mono); font-size: 11px; color: var(--hot); margin-top: 5px; }
-.flip { display: flex; justify-content: space-between; gap: 8px; padding: 2px 4px; margin: 0 -4px; transition: background .2s; }
-.flip.picked { background: #222; outline: 1px solid var(--hot); }
+.flaky { display: flex; justify-content: space-between; gap: 8px; padding: 2px 4px; margin: 0 -4px; transition: background .2s; }
+.flaky.picked { background: #222; outline: 1px solid var(--hot); }
 .hbar { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; margin-top: 4px; }
 .hbar span:first-child { width: 54px; }
 .hbar i { display: block; height: 8px; }

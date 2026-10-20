@@ -10,8 +10,22 @@
 
   const pointer = (fill, stroke) =>
     `<svg width="16" height="18" viewBox="0 0 16 18" aria-hidden="true"><path d="M1 1L1 14L4.5 10.5L7 16.5L9.2 15.5L6.8 9.8L12 9.8Z" fill="${fill}" stroke="${stroke}" stroke-width="1"/></svg>`;
-  const agentCursor = (n) => `<div class="cur agent" data-cur>${pointer('#C6FF00', '#0A0A0A')}<span class="who">agent-${n}</span></div>`;
-  const humanCursor = () => `<div class="cur human" data-cur>${pointer('#0B0B0B', '#fff')}<span class="who">you</span></div>`;
+  const agentCursor = (n) => `<div class="cur agent" data-cur="agent-${n}">${pointer('#C6FF00', '#0A0A0A')}<span class="who">agent-${n}</span></div>`;
+  const humanCursor = () => `<div class="cur human" data-cur="you">${pointer('#0B0B0B', '#fff')}<span class="who">you</span></div>`;
+
+  // Cursors outlive the scenes: render() swaps everything else in host, and cursor() returns the
+  // one already there, so it glides from where the last scene left it instead of jumping.
+  function render(host, html) {
+    for (const n of [...host.children]) if (!n.hasAttribute('data-cur')) n.remove();
+    host.insertAdjacentHTML('afterbegin', html);
+  }
+
+  function cursor(host, name, html) {
+    const found = host.querySelector(`[data-cur="${name}"]`);
+    if (found) return found;
+    host.insertAdjacentHTML('beforeend', html);
+    return host.lastElementChild;
+  }
 
   // Reading a layout property commits the element's start state, so the transition to .on runs
   // even when the tab is in the background and animation frames are paused.
@@ -26,12 +40,14 @@
     return { x: a.left - b.left, y: a.top - b.top, w: a.width, h: a.height };
   }
 
+  // Moves the cursor onto el. box is the window el sits in: the label flips near its right edge.
   async function moveTo(W, cur, el, box) {
-    const p = rel(el, box);
-    const x = p.x + p.w * 0.55;
-    cur.style.left = `${x}px`;
+    const p = rel(el, cur.offsetParent);
+    void cur.getBoundingClientRect();
+    cur.style.left = `${p.x + p.w * 0.55}px`;
     cur.style.top = `${p.y + p.h * 0.5}px`;
-    cur.classList.toggle('flip', x > box.clientWidth - 80);
+    const b = rel(el, box);
+    cur.classList.toggle('flip', b.x + b.w * 0.55 > box.clientWidth - 80);
     await W(700);
   }
 
@@ -134,7 +150,8 @@
 
     async function act1(W) {
       label.textContent = 'act 1 · one agent, one flow';
-      scene.innerHTML = `
+      scene.querySelectorAll('[data-cur]:not([data-cur="agent-1"])').forEach((c) => c.remove());
+      render(scene, `
         <div class="act1">
           <div class="win"><div class="ub mono">acme.shop/cart</div>
             <div class="cart" data-box>
@@ -143,15 +160,15 @@
               <div class="coupon"><span class="field" data-field>Coupon code</span><span class="btn" data-apply>Apply</span></div>
               <div class="total"><span>Total</span><b data-total>$46.00</b></div>
               <svg class="ov" data-ov></svg>
-              ${agentCursor(1)}
               <div class="fl" data-flash></div>
             </div>
           </div>
           <div class="thought log" data-log></div>
         </div>
-        <div class="strip"><span class="dim">evidence/</span><div data-strip style="display:flex;gap:8px"></div></div>`;
+        <div class="strip"><span class="dim">evidence/</span><div data-strip style="display:flex;gap:8px"></div></div>`);
+      const cur = cursor(scene, 'agent-1', agentCursor(1));
       await W(60);
-      const box = $('[data-box]'), cur = $('[data-cur]'), L = $('[data-log]');
+      const box = $('[data-box]'), L = $('[data-log]');
       const field = $('[data-field]'), apply = $('[data-apply]'), total = $('[data-total]');
 
       log(L, 'agent-1 · haiku · TC-03', '#8A8A8A');
@@ -210,7 +227,7 @@
       await W(i * 450);
       log(L, f.lines[0], '#8A8A8A');
       await W(400);
-      await moveTo(W, el.querySelector('[data-cur]'), target, box);
+      await moveTo(W, scene.querySelector(`[data-cur="agent-${i + 1}"]`), target, box);
       log(L, f.lines[1]);
       await flash(W, el.querySelector('.fl'));
       markBox(el.querySelector('.ov'), rel(target, box), f.color);
@@ -221,7 +238,7 @@
 
     async function act2(W) {
       label.textContent = 'act 2 · three agents, three flows, one system';
-      scene.innerHTML = `
+      render(scene, `
         <div class="act2">${flows
           .map(
             (f, i) => `
@@ -232,7 +249,6 @@
                 <div class="bar" style="width:62%"></div><div class="bar" style="width:84%"></div><div class="bar" style="width:40%"></div>
                 <span class="target">${f.target}</span>
                 <svg class="ov"></svg>
-                ${agentCursor(i + 1)}
                 <div class="fl"></div>
               </div>
             </div>
@@ -240,7 +256,16 @@
           </div>`,
           )
           .join('')}</div>
-        <p class="summary in" data-summary>3 isolated browsers · 3 png · <span class="hot">1 FAIL waiting for your sign-off</span></p>`;
+        <p class="summary in" data-summary>3 isolated browsers · 3 png · <span class="hot">1 FAIL waiting for your sign-off</span></p>`);
+      // agent-1 carries over from act 1; the other two open with their windows.
+      scene.querySelectorAll('.mini .body').forEach((body, i) => {
+        if (i === 0) return;
+        const p = rel(body, scene);
+        // Placed before anything reads its style, so it appears there instead of gliding in.
+        const cur = cursor(scene, `agent-${i + 1}`, agentCursor(i + 1));
+        cur.style.left = `${p.x + 12}px`;
+        cur.style.top = `${p.y + 12}px`;
+      });
       await W(60);
       await Promise.all(flows.map((f, i) => agent(W, f, i)));
       await W(400);
@@ -283,7 +308,8 @@
     const $ = (sel) => viewer.querySelector(sel);
 
     function view(title, body) {
-      viewer.innerHTML = `<div class="vbar"><span>viewer · ${title}</span><span>127.0.0.1:4321</span></div><div class="vbody">${body}</div>${humanCursor()}`;
+      render(viewer, `<div class="vbar"><span>viewer · ${title}</span><span>127.0.0.1:4321</span></div><div class="vbody">${body}</div>`);
+      cursor(viewer, 'you', humanCursor());
     }
 
     const go = (W, el) => moveTo(W, $('[data-cur]'), el, viewer);
@@ -427,8 +453,9 @@
     const $ = (sel) => viewer.querySelector(sel);
     const go = (W, el) => moveTo(W, $('[data-cur]'), el, viewer);
 
-    function view(title, right, body, cursor = true) {
-      viewer.innerHTML = `<div class="dbar"><span>${title}</span><span>${right}</span></div><div class="dbody">${body}</div>${cursor ? humanCursor() : ''}`;
+    function view(title, right, body, pointing = true) {
+      render(viewer, `<div class="dbar"><span>${title}</span><span>${right}</span></div><div class="dbody">${body}</div>`);
+      cursor(viewer, 'you', humanCursor()).classList.toggle('off', !pointing);
     }
 
     const hbar = (name, width, value, color) =>
@@ -447,7 +474,7 @@
         </div>
         <div class="insights">
           <div class="icard in"><p class="ih">cases that need attention</p>
-            <div class="flip" data-tc7><span>TC-07 pay with card</span><span class="mono"><span class="acid">P</span> <span class="hot">F</span> <span class="acid">P</span> <span class="hot">F</span></span></div>
+            <div class="flaky" data-tc7><span>TC-07 pay with card</span><span class="mono"><span class="acid">P</span> <span class="hot">F</span> <span class="acid">P</span> <span class="hot">F</span></span></div>
             <p class="ins">↳ flip-flops between runs</p></div>
           <div class="icard in"><p class="ih">outcomes by device</p>
             ${hbar('desktop', 62, '96%', '#C6FF00')}${hbar('mobile', 42, '71%', '#FF3EA5')}
