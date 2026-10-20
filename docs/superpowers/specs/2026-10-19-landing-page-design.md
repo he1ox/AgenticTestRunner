@@ -122,3 +122,29 @@ A third animation, approved after the first PR draft, becomes a new dark § 03 "
 4. **Your feedback compounds:** over 6 runs, questions to you fall 5→0, reviewer agreement rises 72→97% and approved memories grow 0→9. The copy says agents *read approved memory*, not that they are trained.
 
 To avoid repeating it, § 02 drops its dashboard scene (now three scenes) and the $0 section becomes a compact § 04 band. Compare is § 05 and install is § 06.
+
+## Update: § 01 get started and section order (2026-10-20)
+
+qa-runner is no longer framed as "give it a ticket". The hero reads "What you want tested. Run by browser agents. **Signed off by you.**", and the copy says a plan can cover one flow or the whole app, from a ticket, a spec, a pull request or a sentence in chat.
+
+A new light § 01 "Start with one flow. Grow into a release gate." comes right after the hero and works as the map of the page:
+- **Lede:** what qa-runner does for you, and that every decision you make is reused by the next run.
+- **Perfect when** (sticky column on desktop): manual testing before each release, proof before handing off a feature or fix, a legacy migration checked case by case, a CI regression gate before anyone writes test code. A note sends teams that own a Playwright suite to Compare.
+- **Six steps**, each tagged `you` (pink) or `agent` (lime) like the animation cursors: install and set up (copyable command, link to Install), say what to test (example prompts), approve the plan, agents test in a real browser, review every verdict, approve what it learns. Steps 04–06 link to the sections that show them.
+- **Why your review matters:** a dark block on supervision: `validate` before any verdict, nothing final until you sign it off, nothing remembered until you approve it.
+
+Each section then deepens the steps in the order they happen, and Cost moves after Replays because its repair scene starts from a failing replay:
+
+| § | Section | Theme |
+|---|---|---|
+| 00 | Hero | light |
+| 01 | Get started | light |
+| 02 | Evidence (watch it test) | dark |
+| 03 | Sign-off | light |
+| 04 | Insights (your feedback compounds) | dark |
+| 05 | Replays, CI and export | dark |
+| 06 | Cost (spend where it counts) | light |
+| 07 | Compare | light, top rule |
+| 08 | Install | light, top rule |
+
+The nav follows the same order: Get started · Evidence · Sign-off · Insights · Replays · Cost · Install.

@@ -23,11 +23,12 @@
   <header class="nav mono light">
     <a class="wordmark" href="#top">qa-runner<sup>®</sup></a>
     <nav aria-label="Sections">
+      <a href="#start">Get started</a>
       <a href="#watch">Evidence</a>
       <a href="#signoff">Sign-off</a>
       <a href="#smarter">Insights</a>
-      <a href="#spend">Cost</a>
       <a href="#replays">Replays</a>
+      <a href="#spend">Cost</a>
       <a href="#install">Install</a>
     </nav>
     <a class="gh" href="https://github.com/he1ox/AgenticTestRunner">★ GitHub ↗</a>
@@ -60,9 +61,86 @@
       </div>
     </div>
 
+    <section id="start" class="light section">
+      <div class="head grid12">
+        <p class="tag">§ 01 · get started</p>
+        <h2 class="display">Start with one flow.<br>Grow into a <mark>release gate.</mark></h2>
+        <p class="lede">qa-runner turns the coding agent you already use into a QA team that works your way. It plans the cases, tests them in a real browser and brings you the proof. You make every decision that matters, and each one is reused by the next run.</p>
+      </div>
+      <div class="start grid12">
+        <aside class="fit">
+          <h3 class="mono">Perfect when</h3>
+          <ul>
+            <li>You test a web app by hand before each release and lose hours to clicks and screenshots.</li>
+            <li>You ship a feature or a fix and want proof it works before you hand it off.</li>
+            <li>You migrate a legacy system and need the new app to match the old one, case by case.</li>
+            <li>You want a regression gate in CI before anyone writes test code.</li>
+          </ul>
+          <p class="small aside-note">Your team already owns a Playwright suite as code? <a href="#compare">See how it compares</a>.</p>
+        </aside>
+        <ol class="path">
+          <li>
+            <b class="n">01</b>
+            <div>
+              <h3>Install and set up <span class="who you">you · once</span></h3>
+              <p>Run one command, then ask your agent to “set up qa-runner”. It checks Node, npx and ffmpeg, registers the browser and writes <code>.qa/config.json</code> with your app, accounts and variants.</p>
+              <div class="cmd mono">
+                <code id="start-cmd">npx skills add he1ox/AgenticTestRunner</code>
+                <button class="copy" data-copy="start-cmd" aria-label="Copy install command">Copy</button>
+              </div>
+              <a class="more mono" href="#install">Plugins for each agent ↓</a>
+            </div>
+          </li>
+          <li>
+            <b class="n">02</b>
+            <div>
+              <h3>Say what to test <span class="who you">you</span></h3>
+              <p>One flow, a feature or the whole app, in your own words or from a ticket, a spec or a pull request.</p>
+              <p class="say mono">“test the checkout flow with a coupon”<br>“run the test cases for SHOP-42”<br>“regression pass on the admin before the release”</p>
+            </div>
+          </li>
+          <li>
+            <b class="n">03</b>
+            <div>
+              <h3>Approve the plan <span class="who you">you</span></h3>
+              <p>The agent drafts the cases into <code>.qa/plans/</code> and shows you the list. Nothing runs until you approve it, so a wrong assumption costs you a minute instead of a run.</p>
+            </div>
+          </li>
+          <li>
+            <b class="n">04</b>
+            <div>
+              <h3>Agents test in a real browser <span class="who agent">agent</span></h3>
+              <p>For every expected result the Test Agent marks a screenshot, and it can record the tab. When it needs a value it doesn’t have, such as an approver account, it asks you in the viewer and waits.</p>
+              <a class="more mono" href="#watch">Watch an agent test ↓</a>
+            </div>
+          </li>
+          <li>
+            <b class="n">05</b>
+            <div>
+              <h3>Review every verdict <span class="who you">you</span></h3>
+              <p>Check the evidence in the viewer and pick Approve, Needs retest or Reject. Ask the agent what it saw. A retest reruns only the cases you rejected.</p>
+              <a class="more mono" href="#signoff">See a review ↓</a>
+            </div>
+          </li>
+          <li>
+            <b class="n">06</b>
+            <div>
+              <h3>Approve what it learns <span class="who you">you</span></h3>
+              <p>Agents propose lessons about your app, and only the ones you approve are kept in <code>.qa/memory/</code>. Cases you approve become scripts that replay with no agent, at $0, and can gate your CI.</p>
+              <a class="more mono" href="#smarter">See it compound ↓</a>
+            </div>
+          </li>
+        </ol>
+      </div>
+      <div class="why grid12">
+        <h3 class="mono">Why your review matters</h3>
+        <p>Agents do the clicking. You decide what counts. <code>validate</code> checks the evidence before you see a verdict, no verdict is final until you sign it off, and nothing is remembered until you approve it. Every decision lands in files in your repository that the agents read before the next run. The second run asks fewer questions than the first, and over time the agents test the way your team does.</p>
+      </div>
+    </section>
+
     <section id="watch" class="dark section">
       <div class="head grid12">
-        <p class="tag">§ 01 · watch it test</p>
+        <p class="tag">§ 02 · watch it test</p>
         <h2 class="display">Every verdict<br>comes with <em class="hot">proof.</em></h2>
         <p class="lede">For each expected result the Test Agent decides to take a screenshot and marks what it checked: boxes, arrows, numbered steps, blur for personal data. Up to three agents test different flows of the same app at once, each in its own isolated browser.</p>
       </div>
@@ -78,7 +156,7 @@
 
     <section id="signoff" class="light section">
       <div class="head grid12">
-        <p class="tag">§ 02 · you sign off</p>
+        <p class="tag">§ 03 · you sign off</p>
         <h2 class="display">Every answer you approve makes the next run need you less.</h2>
         <ol class="steps mono" data-steps>
           <li><b>01</b> Answer once</li>
@@ -105,7 +183,7 @@
 
     <section id="smarter" class="dark section">
       <div class="head grid12">
-        <p class="tag">§ 03 · insights and replays</p>
+        <p class="tag">§ 04 · insights and replays</p>
         <h2 class="display">Your feedback <span class="acid">compounds.</span></h2>
         <p class="lede">The dashboard shows where to look. The chat explains what an agent saw. Approved cases become Test plans that replay with no agent. And every answer, verdict and lesson you approve is read by the agents before the next run.</p>
         <ol class="steps steps-dark mono" data-steps>
@@ -127,9 +205,27 @@
       </figure>
     </section>
 
+    <section id="replays" class="dark section grid12 replays">
+      <p class="tag">§ 05 · replays, CI and export</p>
+      <div class="zero">
+        <p class="big acid" aria-label="Zero dollars">$0</p>
+        <p class="lede">per replay. Every case you approve is saved as a script that replays later in its own headless browser, with no agent and no tokens. Same steps, same marked screenshots, same recording.</p>
+      </div>
+      <div class="snips">
+        <div class="term mono">
+          <p class="dim"># gate the merge: exits 1 when a case fails</p>
+          <p>node qa-runs.mjs suite run smoke --ci --junit qa-junit.xml</p>
+          <p class="dim"># own the tests as code</p>
+          <p>node qa-runs.mjs export --tag smoke --out e2e/qa</p>
+          <p>npx playwright test --grep @smoke</p>
+        </div>
+        <p class="small">When the UI changes on purpose, <b>Repair with agent</b> re-records only that case.</p>
+      </div>
+    </section>
+
     <section id="spend" class="light section">
       <div class="head grid12">
-        <p class="tag">§ 04 · spend where it counts</p>
+        <p class="tag">§ 06 · spend where it counts</p>
         <h2 class="display">Tokens go only where a case needs them.</h2>
         <p class="lede">Each case gets the model it needs. On a migration, the legacy system is the spec. And when the UI changes on purpose, only the stale case goes back to an agent.</p>
         <ol class="steps mono" data-steps>
@@ -150,27 +246,9 @@
       </figure>
     </section>
 
-    <section id="replays" class="dark section grid12 replays">
-      <p class="tag">§ 05 · replays, CI and export</p>
-      <div class="zero">
-        <p class="big acid" aria-label="Zero dollars">$0</p>
-        <p class="lede">per replay. Every case you approve is saved as a script that replays later in its own headless browser, with no agent and no tokens. Same steps, same marked screenshots, same recording.</p>
-      </div>
-      <div class="snips">
-        <div class="term mono">
-          <p class="dim"># gate the merge: exits 1 when a case fails</p>
-          <p>node qa-runs.mjs suite run smoke --ci --junit qa-junit.xml</p>
-          <p class="dim"># own the tests as code</p>
-          <p>node qa-runs.mjs export --tag smoke --out e2e/qa</p>
-          <p>npx playwright test --grep @smoke</p>
-        </div>
-        <p class="small">When the UI changes on purpose, <b>Repair with agent</b> re-records only that case.</p>
-      </div>
-    </section>
-
-    <section id="compare" class="light section">
+    <section id="compare" class="light section rule">
       <div class="head grid12">
-        <p class="tag">§ 06 · how it compares</p>
+        <p class="tag">§ 07 · how it compares</p>
         <h2 class="display">Starts earlier. Ends with your signature.</h2>
       </div>
       <div class="tablewrap">
@@ -191,7 +269,7 @@
 
     <section id="install" class="light section rule">
       <div class="head grid12">
-        <p class="tag">§ 07 · install</p>
+        <p class="tag">§ 08 · install</p>
         <h2 class="display">One command for any agent.</h2>
         <p class="lede">Or install the plugin for your agent, which also registers the browser. Pick one, not both, or every skill shows up twice.</p>
       </div>
