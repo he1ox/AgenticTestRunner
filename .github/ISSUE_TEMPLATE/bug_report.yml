@@ -1,0 +1,90 @@
+name: Bug report
+description: Something in the skills, the CLI or the viewer does not work as documented.
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Please **remove passwords, tokens and personal
+        data** from logs, plans and screenshots before you paste them: this issue is public.
+        Found a security problem? Do not open an issue: [report it privately](https://github.com/he1ox/AgenticTestRunner/security/advisories/new).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+      placeholder: I ran `suite run smoke --ci` and it exited 0 although TC-2 failed.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The smallest plan, command or prompt that shows it. Attach a trimmed `.qa/plans/*.plan.json` if you can.
+      placeholder: |
+        1. npx skills add he1ox/AgenticTestRunner
+        2. Ask the agent: "run the test cases for SHOP-42"
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: harness
+    attributes:
+      label: Agent harness
+      options:
+        - Claude Code
+        - Codex
+        - Cursor
+        - Gemini CLI
+        - OpenCode
+        - GitHub Copilot CLI
+        - Other / generic
+        - None (CLI or viewer only)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - qa-setup
+        - write-test-plan
+        - run-test-plan (CLI, Test Agents)
+        - replay-test-plan / CI mode
+        - Viewer
+        - Export to Playwright
+        - Install / packaging
+        - Docs or website
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: qa-runner version
+      description: From `.claude-plugin/plugin.json` or the skill's `metadata.version`.
+      placeholder: 0.9.0
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS and Node version
+      placeholder: Windows 11, Node 22.20.0
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output, logs or `qa-runs.mjs doctor`
+      description: Paste text, not screenshots of text. Redact secrets first.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched existing issues and did not find this one.
+          required: true
+        - label: I removed passwords, tokens and personal data from everything above.
+          required: true

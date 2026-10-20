@@ -2,6 +2,9 @@
 
 [![skills.sh](https://skills.sh/b/he1ox/AgenticTestRunner)](https://skills.sh/he1ox/AgenticTestRunner)
 [![ci](https://github.com/he1ox/AgenticTestRunner/actions/workflows/ci.yml/badge.svg)](https://github.com/he1ox/AgenticTestRunner/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/he1ox/AgenticTestRunner/badge)](https://scorecard.dev/viewer/?uri=github.com/he1ox/AgenticTestRunner)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 **What you want tested, run by browser agents and signed off by you.**
 ([website](https://he1ox.github.io/AgenticTestRunner/))
@@ -346,15 +349,22 @@ files, and a file you edited is only replaced with `--force`. `--config` adds a
 action for the tests its filters show. Your project needs `@playwright/test`; qa-runner itself
 still has no npm dependencies.
 
-## Develop
+## Contribute
 
-See [AGENTS.md](AGENTS.md). In short: the Test Agents' rules live in
-`skills/run-test-plan/scripts/agents.mjs` and the metadata in `.claude-plugin/plugin.json`;
-`node scripts/build.mjs` regenerates every agent file and manifest from them, and
-`node scripts/validate-skills.mjs` checks the skills against the
-[Agent Skills spec](https://agentskills.io/specification). CI runs both. Changes are listed in
-[CHANGELOG.md](CHANGELOG.md).
+Contributions are welcome: bug reports, docs, support for another harness, or code. Start with
+[CONTRIBUTING.md](CONTRIBUTING.md); [AGENTS.md](AGENTS.md) maps the repository and its rules. In
+short: no npm dependencies, generated files come from `node scripts/build.mjs`, and
+`node scripts/check.mjs` runs every check CI runs (spec validation, generated files, syntax and
+the `node:test` suite). Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+
+Questions go to [Discussions](https://github.com/he1ox/AgenticTestRunner/discussions),
+vulnerabilities to a [private report](SECURITY.md). Everyone taking part follows the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md).
+
+## License
+
+[MIT](LICENSE)

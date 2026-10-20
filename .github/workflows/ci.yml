@@ -4,48 +4,82 @@ on:
   push:
     branches: [main]
   pull_request:
+  merge_group:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Actions are pinned to a commit SHA (the tag is in the comment); Dependabot keeps them current.
 jobs:
   check:
-    runs-on: ubuntu-latest
+    name: check (node ${{ matrix.node }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # 20 is the minimum the skills support; keep the list in step with CONTRIBUTING.md.
+        node: [20, 22, 24]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: 20
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
 
-      - name: Skills follow the Agent Skills spec
-        run: node scripts/validate-skills.mjs
+      # The same command contributors run: spec validation, generated files, syntax, JSON, tests.
+      - name: All checks
+        run: node scripts/check.mjs
 
-      - name: Generated agents and manifests are up to date
-        run: node scripts/build.mjs --check
-
-      - name: Scripts parse
-        run: for f in $(git ls-files '*.mjs'); do node --check "$f"; done
-
-      - name: Example plan initializes for every harness
-        run: |
-          node skills/run-test-plan/scripts/qa-runs.mjs --project examples init examples/.qa/plans/SHOP-42.plan.json --check
-          for h in claude-code codex cursor gemini opencode copilot generic; do
-            work="$RUNNER_TEMP/$h" && mkdir -p "$work" && cp -r examples/.qa "$work/"
-            Q="node $PWD/skills/run-test-plan/scripts/qa-runs.mjs --project $work"
-            $Q init "$work/.qa/plans/SHOP-42.plan.json" --harness "$h" > /dev/null
-            run=$($Q latest)
-            $Q next "$run" | grep -q '^LAUNCH ' || { echo "next printed no LAUNCH for $h"; exit 1; }
-          done
-
-      # The skills CLI itself needs Node 22.20+; the checks above stay on Node 20, our minimum.
-      - uses: actions/setup-node@v4
+  skills-cli:
+    name: npx skills finds every skill
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The skills CLI itself needs Node 22.20+; the checks above also cover Node 20, our minimum.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-
-      - name: npx skills finds every skill
+      - name: List skills with the skills CLI
         run: |
           set -o pipefail
           npx -y skills@1.7.2 add ./ --list | sed 's/\x1b\[[0-9;]*m//g' > skills.txt
           for s in run-test-plan write-test-plan qa-setup replay-test-plan; do
             grep -q "$s" skills.txt || { echo "npx skills did not list $s"; cat skills.txt; exit 1; }
           done
+
+  actionlint:
+    name: workflows lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.12 -color
+
+  # The one check branch protection requires, so the matrix can change without touching settings.
+  ci-ok:
+    name: ci ok
+    if: always()
+    needs: [check, skills-cli, actionlint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for r in $RESULTS; do [ "$r" = success ] || exit 1; done

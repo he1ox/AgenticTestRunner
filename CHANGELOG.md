@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Open to contributions.** `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1),
+  `SECURITY.md` (private vulnerability reports), `SUPPORT.md`, issue forms, a pull request
+  template, `CODEOWNERS`, `.editorconfig` and `.gitattributes` (LF in every checkout).
+  `docs/open-source-checklist.md` tracks what is in place and what is left.
+- **Tests and one check command.** A `node:test` suite in `test/` (contracts, JUnit, pricing,
+  harnesses, annotations, the literal parser, scheduling, and the CLI end to end for every
+  harness) and `node scripts/check.mjs`, which runs everything CI runs.
+- **Stronger CI.** Checks run on Linux, Windows and macOS with Node 20, 22 and 24, plus
+  actionlint and the skills CLI, behind one required `ci ok` job. New workflows: Conventional
+  Commit PR titles, CodeQL, dependency review, OpenSSF Scorecard, and releases published from
+  `CHANGELOG.md` when a `v*` tag is pushed. Every action is pinned to a commit SHA and kept
+  current by Dependabot.
 - **Landing page** in `site/`: plain HTML, CSS and JS with no dependencies, published to GitHub
   Pages by `.github/workflows/pages.yml`. Three animations tell the story: agents test a shop,
   decide to take screenshots and mark them; you answer a question once, review verdicts and
