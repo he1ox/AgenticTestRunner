@@ -17,7 +17,7 @@
     "id": {
       "type": "string",
       "pattern": "^[A-Za-z0-9._-]+$",
-      "description": "Usually the issue key, e.g. SHOP-42. Prefixes every run id."
+      "description": "The issue key when the plan comes from a ticket (SHOP-42), else a short slug (checkout-coupon). Prefixes every run id."
     },
     "title": {
       "type": "string"

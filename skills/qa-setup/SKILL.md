@@ -31,8 +31,9 @@ from the project root. If that file does not exist, ask the human to install the
 3. **Interview.** Ask only what you can't read from the repo, one short batch of questions:
    - What is the app under test called, and is there a reference app to compare against
      (legacy, production, a design)? → `targets.app`, `targets.reference`
-   - Which issue tracker holds test tickets, and what is an issue's URL? → `tracker.name`,
-     `tracker.issueUrl` with `{key}`
+   - Do test requests live in an issue tracker, and what is an issue's URL? → `tracker.name`,
+     `tracker.issueUrl` with `{key}`. Skip it when there is none: plans can start from a spec
+     or a request in chat.
    - Do cases fork by device, role, plan tier…? → `variants` (key → label + values)
    - Can one user be logged in twice at once? → `execution.sessions` (`shared` | `exclusive`);
      test accounts as `{ "user": "…", "secret": "env:NAME" }` in `execution.accounts`. Ask for
@@ -48,5 +49,5 @@ from the project root. If that file does not exist, ask the human to install the
 
 ## Related skills
 
-- **write-test-plan**: the next step, a plan for a ticket.
+- **write-test-plan**: the next step, a plan for one flow or the whole app.
 - **run-test-plan**: runs plans; reads `harness`, `execution` and `variants` from this config.

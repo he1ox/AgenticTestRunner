@@ -3,32 +3,42 @@
 [![skills.sh](https://skills.sh/b/he1ox/AgenticTestRunner)](https://skills.sh/he1ox/AgenticTestRunner)
 [![ci](https://github.com/he1ox/AgenticTestRunner/actions/workflows/ci.yml/badge.svg)](https://github.com/he1ox/AgenticTestRunner/actions/workflows/ci.yml)
 
-**Your manual test cases, run by browser agents and signed off by you.**
+**What you want tested, run by browser agents and signed off by you.**
+([website](https://he1ox.github.io/AgenticTestRunner/))
 
 qa-runner is a set of agent skills for the coding agent you already use: Claude Code, Codex,
-Cursor, Gemini CLI, OpenCode, GitHub Copilot CLI and others. Give it a ticket. It drafts the test
-cases for your approval, runs each one in a real browser, and backs every verdict with marked
-screenshots and a recording. You approve or reject each result. Every case you approve is saved
-as a script that replays later without an agent, at $0 in tokens.
+Cursor, Gemini CLI, OpenCode, GitHub Copilot CLI and others. Tell it what to test, one flow or
+the whole app, and point it at whatever describes it: a ticket, a spec, a pull request or a
+sentence in chat. It drafts the test cases for your approval, runs each one in a real browser,
+and backs every verdict with marked screenshots and a recording. You approve or reject each
+result. Every case you approve is saved as a script that replays later without an agent, at $0
+in tokens.
 
 ```bash
 npx skills add he1ox/AgenticTestRunner
 ```
 
-Then ask your agent to "run the test cases for SHOP-42".
+Then ask your agent to "test the checkout flow with a coupon", or "run the test cases for
+SHOP-42".
 
 ![Human in the loop: you approve the plan, orchestrate the Test Agents, answer their questions, review the evidence and approve what they learn. Each answer, script and rule you approve makes the system work more like you.](docs/human-in-the-loop.gif)
 
 ## Built for the person who signs off the release
 
-You test a web app by working through the test cases in a ticket: log in, click through each
-step, compare what you see with the expected result, take screenshots, paste them into the
-ticket, and do it all again next release. qa-runner does the clicking and the screenshots, and
-leaves every verdict to you.
+You test a web app by hand: log in, click through each step, compare what you see with the
+expected result, take screenshots, paste them into a ticket or a report, and do it all again
+next release. qa-runner does the clicking and the screenshots, and leaves every verdict to you.
 
-It fits QA engineers and QA leads who run manual or exploratory test plans, and developers who
-verify their own feature before they hand it off. If your team writes and maintains a Playwright
-suite as code, read [how it compares](#how-it-compares) first.
+Test as narrowly or as broadly as the moment needs: the one case a bug fix touches, a feature
+before you hand it off, or a regression pass over the whole app before a release. The agents
+work the way your project does. They test with your variants (device, role, plan tier), your
+accounts and the agent and model you already use, and every answer and rule you approve is
+reused by later runs.
+
+It fits QA engineers and QA leads who run manual or exploratory test plans, developers who
+verify their own work, and anyone who wants evidence that their app works before they ship it.
+If your team writes and maintains a Playwright suite as code, read
+[how it compares](#how-it-compares) first.
 
 ## Every verdict comes with proof
 
@@ -37,8 +47,8 @@ arrows, numbered steps, text legends, blur for personal data, spotlight. With re
 records the tab while it tests and saves an MP4 with the dead air cut.
 
 The marks live in a JSON file next to the image, so the pixels stay untouched. In the viewer you
-add your own marks, switch them off to see the raw screenshot, or export a flattened PNG for the
-ticket. A replay redraws the same marks.
+add your own marks, switch them off to see the raw screenshot, or export a flattened PNG for a
+bug report. A replay redraws the same marks.
 
 Before anyone sees a verdict, `validate` checks the run against the result contract. It flags
 missing evidence, failures the agent didn't explain, missing recordings and credentials that
@@ -50,8 +60,9 @@ leaked into the output.
 
 Agents do the repetitive work. You make four decisions, and each one is reused by later runs:
 
-1. **Approve the plan.** `write-test-plan` turns the ticket into `.qa/plans/<KEY>.plan.json` and
-   shows you the case list before anything runs.
+1. **Approve the plan.** `write-test-plan` turns what you asked for (a ticket, a spec, a pull
+   request or your own words) into `.qa/plans/<KEY>.plan.json` and shows you the case list
+   before anything runs.
 2. **Answer questions.** When an agent needs a value it doesn't have, such as an approver account
    or a coupon code, it asks in the viewer and waits. Tick "Remember" and later runs in the same
    situation reuse your answer.
@@ -93,8 +104,9 @@ when the harness reports no usage or the model has no price. Filter by date rang
 ## How it compares
 
 - **Playwright Test Agents** (planner, generator, healer) write and repair `.spec.ts` files.
-  Choose them if your team wants test code to own and maintain. qa-runner starts earlier: it
-  runs the test cases from a ticket and gives you evidence to sign off on. The cases you approve
+  Choose them if your team wants test code to own and maintain. qa-runner starts earlier: you
+  describe what to test in plain language, and it runs those cases and gives you evidence to
+  sign off on. The cases you approve
   can then be exported as `.spec.ts` files, so the two work together.
 - **AI testing platforms** such as Momentic, QA Wolf and testRigor run your tests on their
   platform under a subscription. qa-runner runs on your machine with the agent and model you
@@ -123,7 +135,7 @@ design) and the deviations are reported.
 | Skill | Use it to |
 |---|---|
 | [`qa-setup`](skills/qa-setup/SKILL.md) | Prepare a project once: check Node/npx/ffmpeg, register the browser, write `.qa/config.json` |
-| [`write-test-plan`](skills/write-test-plan/SKILL.md) | Turn a ticket into `.qa/plans/<KEY>.plan.json` and get the case list approved |
+| [`write-test-plan`](skills/write-test-plan/SKILL.md) | Turn a ticket, a spec or a request in chat into `.qa/plans/<KEY>.plan.json` and get the case list approved |
 | [`run-test-plan`](skills/run-test-plan/SKILL.md) | Run the plan with browser agents, open the viewer, retest what a reviewer rejects |
 | [`replay-test-plan`](skills/replay-test-plan/SKILL.md) | Replay saved Test plans without an agent, repair stale scripts |
 
@@ -236,7 +248,8 @@ complete config, plan and memory.
 
 ## Use
 
-Ask your agent to run a test plan ("run the test plan for SHOP-42", "corre los test cases"). The
+Ask your agent to test something ("test the refund flow as an approver", "run the test plan for
+SHOP-42", "corre los test cases"). The
 skills draft or reuse `.qa/plans/<KEY>.plan.json`, ask you to approve the cases, run them, and
 open the viewer at `http://127.0.0.1:4321`.
 
