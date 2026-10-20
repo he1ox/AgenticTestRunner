@@ -106,27 +106,52 @@
 
   // Runs scenes in order, in a loop, while the figure is on screen. Every run holds a token;
   // leaving the screen or pressing Replay changes the token and the old run stops at its next
-  // wait. With reduced motion every wait is instant and the scenes run once, so the figure shows
-  // the final state of the last scene.
+  // wait. With reduced motion every wait is instant and one scene runs at a time: the figure
+  // shows that scene's final state, and the button becomes "Next scene".
+  // The figure never shrinks back once a scene has made it taller, so the page below it stays
+  // put when scenes of different heights take turns. A new width starts the measure again.
   function player(figure, scenes) {
     let token = 0;
+    let current = 0;
     let visible = false;
+    let tallest = 0;
+    let width = innerWidth;
+    const hold = () => {
+      const h = figure.offsetHeight;
+      if (h > tallest) figure.style.minHeight = `${(tallest = h)}px`;
+    };
+    addEventListener('resize', () => {
+      if (innerWidth === width) return;
+      width = innerWidth;
+      tallest = 0;
+      figure.style.minHeight = '';
+    });
     const wait = (t, ms) =>
-      new Promise((resolve, reject) => setTimeout(() => (t === token ? resolve() : reject(STOP)), reduce ? 0 : ms));
+      new Promise((resolve, reject) =>
+        setTimeout(() => {
+          if (t !== token) return reject(STOP);
+          hold();
+          resolve();
+        }, reduce ? 0 : ms),
+      );
 
     async function run() {
       const t = ++token;
       const W = (ms) => wait(t, ms);
       try {
-        do {
-          for (const scene of scenes) await scene(W);
-        } while (!reduce);
+        if (reduce) await scenes[current](W);
+        else for (;;) for (const scene of scenes) await scene(W);
       } catch (err) {
         if (err !== STOP) throw err;
       }
     }
 
-    figure.querySelector('[data-replay]').addEventListener('click', run);
+    const button = figure.querySelector('[data-replay]');
+    if (reduce && scenes.length > 1) button.textContent = 'Next scene';
+    button.addEventListener('click', () => {
+      if (reduce) current = (current + 1) % scenes.length;
+      run();
+    });
     if (!('IntersectionObserver' in window)) return run();
     new IntersectionObserver(
       ([entry]) => {
@@ -677,6 +702,319 @@
     player(figure, [insights, chat, testPlan, compound]);
   }
 
+  // § 04: the orchestrator weighs each case and launches subagents sized to their batch, an
+  // agent compares the new app with the legacy one, and a stale replay is repaired by sending
+  // only that case back to an agent.
+  function spend(section) {
+    const figure = section.querySelector('.stage');
+    const viewer = figure.querySelector('[data-viewer]');
+    const caption = figure.querySelector('[data-caption]');
+    const stage = stepper(section, figure);
+    const $ = (sel) => viewer.querySelector(sel);
+    const go = (W, who, el) => moveTo(W, viewer.querySelector(`[data-cur="${who}"]`), el, viewer);
+
+    // Shows the named cursor (or none) and fades out the others where they stand.
+    function view(title, right, body, who) {
+      render(viewer, `<div class="vbar"><span>${title}</span><span>${right}</span></div><div class="vbody">${body}</div>`);
+      if (who) cursor(viewer, who, who === 'you' ? humanCursor() : agentCursor(who.slice(6)));
+      for (const c of viewer.querySelectorAll('[data-cur]')) c.classList.toggle('off', c.dataset.cur !== who);
+    }
+
+    // A case's weight is the tier it would get alone (1 simple, 2 standard, 3 complex). Cases that
+    // share a login form a batch, and the batch runs on its hardest case's tier.
+    const tiers = ['', 'simple', 'standard', 'complex'];
+    const power = (n) => '●'.repeat(n) + '○'.repeat(3 - n);
+    const batches = [
+      { cases: [['TC-01', 'login', 'read-only · 4 steps', 1], ['TC-02', 'search catalog', 'read-only · 5 steps', 1]], run: [700, 900], tokens: 22 },
+      { cases: [['TC-03', 'coupon 10%', 'read-only · 3 steps', 1], ['TC-04', 'edit address', 'changes data', 2]], run: [900, 1300], tokens: 52 },
+      { cases: [['TC-07', 'pay with card', 'failed last run', 3], ['TC-09', 'order history', 'legacy check: always', 3]], run: [1500, 1700], tokens: 84 },
+    ];
+    const weight = (b) => Math.max(...b.cases.map((c) => c[3]));
+
+    const subCard = (n, tier, ids, note = '') => `
+      <div class="osub t${tier}" data-sub="${n}">
+        <div class="hd"><span>agent-${n} · ${tiers[tier]}${note}</span>
+          <span class="cs">${ids.map((id) => `<span class="ochip" data-c="${id}">${id}</span>`).join('')}</span><span class="pw">${power(tier)}</span></div>
+        <div class="obars"><span>progress</span><span class="obar"><i data-p></i></span><span>tokens</span><span class="obar tok"><i data-t></i></span></div>
+      </div>`;
+
+    async function route(W) {
+      stage(1, 'route each case');
+      view(
+        'run SHOP-57',
+        'orchestrator',
+        `<div class="orch" data-orch>
+          <svg class="osvg" data-osvg></svg>
+          <div class="ocases">${batches
+            .map(
+              (b, i) => `<div class="obatch" data-b="${i}">
+                <div class="bt"><span>batch ${i + 1}</span><span class="tier t-${tiers[weight(b)]} in" data-bt>${tiers[weight(b)]} ${power(weight(b))}</span></div>
+                ${b.cases
+                  .map(
+                    ([id, name, sig, w]) => `<div class="ocase" data-w="${w}"><span class="id">${id}</span><span class="nm">${name}</span>
+                      <span class="sig">${sig}</span><span class="meter"><i></i><i></i><i></i></span></div>`,
+                  )
+                  .join('')}</div>`,
+            )
+            .join('')}</div>
+          <div class="onode" data-node><b>orchestrator</b><span class="ost" data-ost>reading the plan</span></div>
+          <div class="osubs" data-subs>${batches.map((b, i) => subCard(i + 1, weight(b), b.cases.map((c) => c[0]))).join('')}${subCard(4, 2, ['TC-02'], ' · retry')}</div>
+        </div>
+        <p class="onote">Parallel subagents: the Claude Code plugin runs up to 3 at once. Other agents run one batch at a time.</p>`,
+        null,
+      );
+      await W(300);
+      const orch = $('[data-orch]'), svg = $('[data-osvg]'), node = $('[data-node]'), ost = $('[data-ost]');
+      const wide = () => getComputedStyle(orch).gridTemplateColumns.split(' ').length > 1;
+
+      // A connector from a to b: a curve between columns, or down the left gutter when the
+      // columns stack on a phone.
+      function route(a, b) {
+        const p = rel(a, orch), q = rel(b, orch);
+        let d;
+        if (wide()) {
+          const sx = p.x + p.w, sy = p.y + p.h / 2, ex = q.x, ey = q.y + q.h / 2, m = (ex - sx) / 2;
+          d = `M${sx} ${sy} C${sx + m} ${sy} ${ex - m} ${ey} ${ex} ${ey}`;
+        } else if (q.x > p.x + 4) {
+          const sx = p.x + 8, ey = q.y + q.h / 2;
+          d = `M${sx} ${p.y + p.h} C${sx} ${ey} ${sx} ${ey} ${q.x} ${ey}`;
+        } else {
+          const x = q.x + q.w / 2;
+          d = `M${x} ${p.y + p.h} L${x} ${q.y}`;
+        }
+        return d;
+      }
+
+      function link(a, b) {
+        const path = document.createElementNS(NS, 'path');
+        for (const [k, v] of Object.entries({ d: route(a, b), class: 'olink', fill: 'none', stroke: '#0B0B0B', 'stroke-width': 1.5 })) path.setAttribute(k, v);
+        path.ends = [a, b];
+        svg.appendChild(path);
+        show(path);
+        return path;
+      }
+
+      // Cards move when a status chip wraps a line or the window turns: redraw every connector so
+      // it stays attached.
+      const redraw = new ResizeObserver(() => {
+        if (!orch.isConnected) return redraw.disconnect();
+        for (const path of svg.querySelectorAll('.olink')) path.setAttribute('d', route(...path.ends));
+      });
+      redraw.observe(orch);
+
+      // A dot that travels a connector, backwards for a report to the orchestrator.
+      function pulse(path, color, back = false) {
+        if (reduce) return;
+        const dot = document.createElementNS(NS, 'circle');
+        for (const [k, v] of Object.entries({ r: 4.5, fill: color, stroke: '#0B0B0B', 'stroke-width': 1 })) dot.setAttribute(k, v);
+        const motion = document.createElementNS(NS, 'animateMotion');
+        const attrs = { path: path.getAttribute('d'), dur: '0.6s', fill: 'freeze', begin: 'indefinite' };
+        if (back) Object.assign(attrs, { keyPoints: '1;0', keyTimes: '0;1', calcMode: 'linear' });
+        for (const [k, v] of Object.entries(attrs)) motion.setAttribute(k, v);
+        dot.appendChild(motion);
+        svg.appendChild(dot);
+        motion.beginElement();
+        setTimeout(() => dot.remove(), 700);
+      }
+
+      node.classList.add('busy');
+      for (const c of viewer.querySelectorAll('.ocase')) {
+        show(c);
+        await W(130);
+      }
+      await W(300);
+      ost.textContent = 'weighing each case';
+      caption.textContent = 'The orchestrator weighs every case: steps, data changes, recordings, recent failures, legacy checks.';
+      for (const c of viewer.querySelectorAll('.ocase')) {
+        c.classList.add('scan');
+        const bars = c.querySelectorAll('.meter i');
+        for (let i = 0; i < +c.dataset.w; i++) {
+          bars[i].classList.add('f');
+          await W(110);
+        }
+        await W(140);
+        c.classList.remove('scan');
+      }
+
+      ost.textContent = 'cutting batches';
+      caption.textContent = 'Cases that share a login form a batch. The batch runs on the tier of its hardest case.';
+      let toNode;
+      for (const [i, b] of viewer.querySelectorAll('[data-b]').entries()) {
+        b.classList.add('on');
+        const cases = b.querySelectorAll('.ocase');
+        if (new Set([...cases].map((c) => c.dataset.w)).size > 1)
+          cases.forEach((c) => c.classList.toggle('hard', +c.dataset.w === weight(batches[i])));
+        show(b.querySelector('[data-bt]'));
+        if (wide() || !toNode) toNode = link(wide() ? b : $('.ocases'), node);
+        pulse(toNode, '#0B0B0B');
+        await W(700);
+      }
+
+      ost.textContent = 'launching 3 subagents';
+      caption.textContent = 'One subagent per batch, each on the tier its batch needs and in its own browser.';
+      const toSub = [];
+      for (const n of [1, 2, 3]) {
+        const s = $(`[data-sub="${n}"]`);
+        toSub[n] = link(node, s);
+        pulse(toSub[n], '#C6FF00');
+        await W(320);
+        show(s);
+        await W(260);
+      }
+
+      async function runAgent(n, ids, times, tokens, failing) {
+        const s = $(`[data-sub="${n}"]`);
+        const progress = s.querySelector('[data-p]'), spent = s.querySelector('[data-t]');
+        for (const bar of [progress, spent]) bar.style.transitionDuration = `${times.reduce((a, b) => a + b, 0)}ms`;
+        void s.getBoundingClientRect();
+        progress.style.width = '100%';
+        spent.style.width = `${tokens}%`;
+        for (const [i, id] of ids.entries()) {
+          const chip = s.querySelector(`[data-c="${id}"]`);
+          chip.classList.add('run');
+          await W(times[i]);
+          chip.classList.replace('run', id === failing ? 'fail' : 'pass');
+          if (id === failing) chip.textContent = `${id} ✕`;
+        }
+      }
+
+      async function escalate() {
+        const b = batches[0];
+        await runAgent(1, b.cases.map((c) => c[0]), b.run, b.tokens, 'TC-02');
+        pulse(toSub[1], '#FF3EA5', true);
+        ost.textContent = 'escalating TC-02';
+        await W(650);
+        const s = $('[data-sub="4"]');
+        pulse(link(node, s), '#C6FF00');
+        await W(320);
+        show(s);
+        $('[data-sub="1"] [data-c="TC-02"]').textContent = 'TC-02 ↑';
+        ost.textContent = 'watching 4 subagents';
+        await W(260);
+        await runAgent(4, ['TC-02'], [1100], 34);
+      }
+
+      ost.textContent = 'watching 3 subagents';
+      await Promise.all([
+        escalate(),
+        ...[2, 3].map((n) => runAgent(n, batches[n - 1].cases.map((c) => c[0]), batches[n - 1].run, batches[n - 1].tokens)),
+      ]);
+      node.classList.remove('busy');
+      ost.textContent = 'done · 6 passed';
+      caption.textContent = 'When a light subagent fails a case, the orchestrator retries it once on a stronger one.';
+      await W(3200);
+    }
+
+    const orders = (dates, filter) => `
+      <span class="ofilter${filter ? '' : ' ghost'}" data-filter>Status ▾</span>
+      <div class="orow"><span>#1042</span><span data-date>${dates[0]}</span><span data-total>$41.40</span></div>
+      <div class="orow"><span>#1039</span><span>${dates[1]}</span><span>$88.00</span></div>
+      <div class="orow"><span>#1031</span><span>${dates[2]}</span><span>$12.90</span></div>`;
+
+    async function compare(W) {
+      stage(2, 'compare with legacy');
+      view(
+        'SHOP-57 · TC-09 · order history',
+        'agent-2 · sonnet · high',
+        `<div class="cmp">
+          <div data-new><p class="lab">App under test</p>
+            <div class="win"><div class="ub mono">new.acme.shop/orders</div><div class="orows">${orders(['2026-10-18', '2026-10-12', '2026-09-30'], true)}</div></div></div>
+          <div data-old><p class="lab">Legacy app</p>
+            <div class="win"><div class="ub mono">old.acme.shop/orders</div><div class="orows">${orders(['18/10/2026', '12/10/2026', '30/09/2026'], false)}</div></div></div>
+          <svg class="ov" data-ov></svg>
+        </div>
+        <div class="cmp-res" data-res></div>`,
+        'agent-2',
+      );
+      await W(500);
+      const cmp = $('.cmp'), ov = $('[data-ov]'), res = $('[data-res]');
+      const pick = (side, sel) => $(`[data-${side}] [data-${sel}]`);
+      const found = (kind, text) => {
+        const d = document.createElement('span');
+        d.className = 'in';
+        d.innerHTML = `<span class="chip ${{ deviation: 'fail', improvement: 'pass' }[kind] || ''}"></span> `;
+        d.firstChild.textContent = kind;
+        d.append(text);
+        res.appendChild(d);
+        show(d);
+      };
+      const check = async (sel, color) => {
+        for (const side of ['new', 'old']) {
+          await go(W, 'agent-2', pick(side, sel));
+          markBox(ov, rel(pick(side, sel), cmp), color);
+          await W(250);
+        }
+      };
+      await check('total', '#0B0B0B');
+      found('same', 'order ids and totals');
+      await W(500);
+      await check('date', '#FF3EA5');
+      found('deviation', 'date format');
+      await W(500);
+      await go(W, 'agent-2', pick('new', 'filter'));
+      markBox(ov, rel(pick('new', 'filter'), cmp), '#0B0B0B');
+      found('improvement', 'status filter, new');
+      caption.textContent = 'On a migration the legacy app is the spec. By default the agent opens it only when the new app deviates from the expected result.';
+      await W(2400);
+      caption.textContent = 'Parity-critical cases set referenceCheck: always. Each difference comes back as same, deviation or improvement for you to judge.';
+      await W(2400);
+    }
+
+    const replays = [
+      ['TC-01', 'login'],
+      ['TC-02', 'search catalog'],
+      ['TC-03', 'coupon 10%'],
+      ['TC-04', 'edit address'],
+      ['TC-09', 'order history'],
+    ];
+
+    async function repair(W) {
+      stage(3, 'repair what changed');
+      view(
+        'tests · Release 1.0.1',
+        'replay · no agent',
+        `${replays
+          .map(([id, name]) => `<div class="rt"><span class="id">${id}</span><span class="name">${name}</span><span class="res" data-res>script v2</span></div>`)
+          .join('')}
+        <div class="fcard in" data-fail>
+          <div class="k">TC-03 · 03-failure.png · step 3 of 5</div>
+          <div class="fshot"><span class="field">Coupon code</span><span class="btn" data-redeem>Redeem</span></div>
+          <div class="err">TimeoutError: getByRole('button', { name: 'Apply' })</div>
+          <div class="inrow"><span class="ui-btn" data-heal>Repair with agent</span><span class="mono small-m">re-records this case only</span></div>
+          <svg class="ov" data-ov></svg>
+        </div>`,
+        'you',
+      );
+      await W(400);
+      const results = viewer.querySelectorAll('[data-res]');
+      for (const [i, el] of results.entries()) {
+        el.textContent = 'replaying…';
+        el.classList.add('live');
+        await W(360);
+        el.innerHTML = i === 2 ? '<span class="hot">FAIL</span> · step 3' : '<b>PASS</b> · $0';
+      }
+      const fail = $('[data-fail]');
+      show(fail);
+      await W(500);
+      markBox($('[data-ov]'), rel($('[data-redeem]'), fail), '#FF3EA5');
+      caption.textContent = 'The Apply button is now called Redeem: the UI changed on purpose, the product did not break.';
+      await W(1800);
+      const heal = $('[data-heal]');
+      await go(W, 'you', heal);
+      await press(W, heal);
+      heal.style.background = '#C6FF00';
+      heal.textContent = 'Repairing…';
+      results[2].textContent = 'agent-1 · repairing…';
+      await W(1600);
+      results[2].innerHTML = '<b>PASS</b> · script v3';
+      heal.textContent = 'Repaired ✓';
+      caption.textContent = 'Only the stale case went back to an agent. Its new script is v3 of the same test; the rest kept replaying at $0.';
+      await W(3000);
+    }
+
+    player(figure, [route, compare, repair]);
+  }
+
   function tabs(root) {
     const list = [...root.querySelectorAll('[role="tab"]')];
     const select = (tab) => {
@@ -725,6 +1063,7 @@
   watchIt(document.querySelector('#watch .stage'));
   signOff(document.querySelector('#signoff'));
   smarter(document.querySelector('#smarter'));
+  spend(document.querySelector('#spend'));
   document.querySelectorAll('[data-tabs]').forEach(tabs);
   copyButtons();
 })();

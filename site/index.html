@@ -26,6 +26,7 @@
       <a href="#watch">Evidence</a>
       <a href="#signoff">Sign-off</a>
       <a href="#smarter">Insights</a>
+      <a href="#spend">Cost</a>
       <a href="#replays">Replays</a>
       <a href="#install">Install</a>
     </nav>
@@ -126,8 +127,31 @@
       </figure>
     </section>
 
+    <section id="spend" class="light section">
+      <div class="head grid12">
+        <p class="tag">§ 04 · spend where it counts</p>
+        <h2 class="display">Tokens go only where a case needs them.</h2>
+        <p class="lede">Each case gets the model it needs. On a migration, the legacy system is the spec. And when the UI changes on purpose, only the stale case goes back to an agent.</p>
+        <ol class="steps mono" data-steps>
+          <li><b>01</b> Route each case</li>
+          <li><b>02</b> Compare with legacy</li>
+          <li><b>03</b> Repair what changed</li>
+        </ol>
+      </div>
+      <figure class="stage stage-light">
+        <figcaption class="stagebar mono">
+          <span data-label>01 / 03 · route each case</span>
+          <span class="example">example data</span>
+          <button class="replay" data-replay>Replay</button>
+        </figcaption>
+        <div class="viewer spend-viewer" data-viewer aria-hidden="true"></div>
+        <p class="caption mono" data-caption aria-hidden="true"></p>
+        <p class="sr-only">Animation: the orchestrator weighs six cases by their steps, data changes, recent failures and legacy checks, groups them into three batches that each take their hardest case's tier, and launches one subagent per batch: simple, standard and complex, each in its own browser. When the simple subagent fails a case, the orchestrator retries only that case on a standard subagent, and it passes. Next, an agent runs the order history on the new app and on the legacy app: totals are the same, the date format deviates and the new status filter is an improvement. Last, a Test plan replays with no agent and one case fails because the Apply button is now called Redeem; you press Repair with agent, only that case goes back to an agent, it passes and its script becomes version 3 while the other cases keep replaying at $0.</p>
+      </figure>
+    </section>
+
     <section id="replays" class="dark section grid12 replays">
-      <p class="tag">§ 04 · replays, CI and export</p>
+      <p class="tag">§ 05 · replays, CI and export</p>
       <div class="zero">
         <p class="big acid" aria-label="Zero dollars">$0</p>
         <p class="lede">per replay. Every case you approve is saved as a script that replays later in its own headless browser, with no agent and no tokens. Same steps, same marked screenshots, same recording.</p>
@@ -146,7 +170,7 @@
 
     <section id="compare" class="light section">
       <div class="head grid12">
-        <p class="tag">§ 05 · how it compares</p>
+        <p class="tag">§ 06 · how it compares</p>
         <h2 class="display">Starts earlier. Ends with your signature.</h2>
       </div>
       <div class="tablewrap">
@@ -167,7 +191,7 @@
 
     <section id="install" class="light section rule">
       <div class="head grid12">
-        <p class="tag">§ 06 · install</p>
+        <p class="tag">§ 07 · install</p>
         <h2 class="display">One command for any agent.</h2>
         <p class="lede">Or install the plugin for your agent, which also registers the browser. Pick one, not both, or every skill shows up twice.</p>
       </div>
