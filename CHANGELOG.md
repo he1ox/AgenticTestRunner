@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Landing page** in `site/`: plain HTML, CSS and JS with no dependencies, published to GitHub
+  Pages by `.github/workflows/pages.yml`. Two animations tell the story: agents test a shop,
+  decide to take screenshots and mark them; then you answer a question once, review verdicts,
+  approve what agents learn and watch cost and questions per run fall. `site/llms.txt` points
+  agents at the skills. `bump-version.mjs` also updates the version shown on the page.
+
 ## 0.9.0 — 2026-10-11
 
 From sign-off to pipeline: approved cases gate CI and export as Playwright code.

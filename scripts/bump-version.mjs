@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Sets one version everywhere: .claude-plugin/plugin.json (the source build.mjs copies into the
-// other manifests), every SKILL.md's metadata.version, and the skill README's table; then
-// rebuilds the manifests. Usage: node scripts/bump-version.mjs 0.8.0
+// other manifests), every SKILL.md's metadata.version, the skill README's table and the landing
+// page (site/index.html); then rebuilds the manifests. Usage: node scripts/bump-version.mjs 0.8.0
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -30,4 +30,5 @@ for (const skill of readdirSync(join(root, 'skills'))) {
 }
 const readme = join('skills', 'run-test-plan', 'README.md');
 if (existsSync(join(root, readme))) edit(readme, (s) => s.replace(/(\| Version \| )[^|]+( \|)/, `$1${next}$2`));
+edit(join('site', 'index.html'), (s) => s.replace(/(<span data-version>v)[^<]+(<)/, `$1${next}$2`));
 execFileSync(process.execPath, [join(root, 'scripts', 'build.mjs')], { stdio: 'inherit' });

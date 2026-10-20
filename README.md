@@ -4,6 +4,7 @@
 [![ci](https://github.com/he1ox/AgenticTestRunner/actions/workflows/ci.yml/badge.svg)](https://github.com/he1ox/AgenticTestRunner/actions/workflows/ci.yml)
 
 **Your manual test cases, run by browser agents and signed off by you.**
+([website](https://he1ox.github.io/AgenticTestRunner/))
 
 qa-runner is a set of agent skills for the coding agent you already use: Claude Code, Codex,
 Cursor, Gemini CLI, OpenCode, GitHub Copilot CLI and others. Give it a ticket. It drafts the test
