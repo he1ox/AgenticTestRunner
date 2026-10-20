@@ -91,7 +91,8 @@ distribution channel. `[x]` is done; `[ ]` is open, with who or what it waits fo
 - [x] Semantic Versioning, one version everywhere via `scripts/bump-version.mjs`.
 - [x] Release workflow: a `vX.Y.Z` tag checks the version, runs every check and publishes the
   GitHub release from the changelog.
-- [ ] Tag `v0.9.0` on the commit that released it, so the first GitHub release exists.
+- [x] First GitHub release: [`v0.9.0`](https://github.com/he1ox/AgenticTestRunner/releases/tag/v0.9.0), tagged on the commit that
+  shipped it (before the release workflow existed, so it was published by hand).
 
 ## 7. Governance and maintenance
 
