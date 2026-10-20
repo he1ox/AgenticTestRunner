@@ -1,6 +1,6 @@
 ---
 name: write-test-plan
-description: Use when asked to write, draft, update or review a QA test plan for a web app ("write the test cases for SHOP-42", "arma el plan de pruebas", "add a case for the refund flow") before running it with browser agents. Turns an issue-tracker ticket into .qa/plans/<KEY>.plan.json and gets the human's approval of the case list.
+description: Use when asked to write, draft, update or review a QA test plan for a web app ("write the test cases for SHOP-42", "test the checkout flow", "arma el plan de pruebas", "add a case for the refund flow") before running it with browser agents. Turns whatever describes what to test (an issue-tracker ticket, a spec or user story, a pull request, or the human's own words) into .qa/plans/<KEY>.plan.json, scoped to one flow or the whole app, and gets the human's approval of the case list.
 license: MIT
 compatibility: Part of qa-runner; needs the run-test-plan skill installed alongside (its CLI validates the plan). Node.js 20+.
 metadata:
@@ -21,8 +21,12 @@ from the project root. If that file does not exist, ask the human to install the
 ## Steps
 
 1. **Reuse first.** If `.qa/plans/<KEY>.plan.json` exists, update it rather than writing a new one.
-2. **Read the source.** The ticket's description, latest comments and blocking bugs. Don't post
-   to or transition the ticket.
+   `<KEY>` is the ticket key when there is one (`SHOP-42`), else a short slug (`checkout-coupon`).
+2. **Read the source.** Whatever the human pointed at: a ticket (description, latest comments,
+   blocking bugs), a spec or user story, a pull request, or only their request. Match its scope:
+   one flow, a feature, or a regression pass over the whole app. When the request leaves out the
+   app's URL, the expected results or the scope, ask before drafting. Don't post to or
+   transition a ticket.
 3. **Study only what is unclear.** If behaviour forks by a variant (device, role, plan tier…) or
    the comparison with the reference app is unclear, have ONE read-only research pass study the
    code (a subagent on a small, cheap model if your agent has one, otherwise yourself) and write

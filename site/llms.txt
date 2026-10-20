@@ -1,6 +1,6 @@
 # qa-runner
 
-> Agent skills that run manual test cases in a real browser, back every verdict with marked screenshots and a recording, and leave the sign-off to a human. Cases the human approves are saved as scripts that replay without an agent, at $0 in tokens. Works with Claude Code, Codex, Cursor, Gemini CLI, OpenCode, GitHub Copilot CLI and other agents that run shell commands and MCP tools.
+> Agent skills that test one flow or a whole web app in a real browser, from a ticket, a spec, a pull request or a request in chat. They draft the test cases for approval, run them, back every verdict with marked screenshots and a recording, and leave the sign-off to a human. Cases the human approves are saved as scripts that replay without an agent, at $0 in tokens. Works with Claude Code, Codex, Cursor, Gemini CLI, OpenCode, GitHub Copilot CLI and other agents that run shell commands and MCP tools.
 
 Install for every detected agent:
 
@@ -8,12 +8,12 @@ Install for every detected agent:
 npx skills add he1ox/AgenticTestRunner
 ```
 
-Then register the browser once: ask the agent to "set up qa-runner" (the qa-setup skill), and run a plan with "run the test cases for SHOP-42". Requirements: Node.js 20+, npx (for Playwright MCP), ffmpeg only for recordings. No npm dependencies.
+Then register the browser once: ask the agent to "set up qa-runner" (the qa-setup skill), and ask it to "test the checkout flow" or "run the test cases for SHOP-42". Requirements: Node.js 20+, npx (for Playwright MCP), ffmpeg only for recordings. No npm dependencies.
 
 ## Skills
 
 - [qa-setup](https://github.com/he1ox/AgenticTestRunner/blob/main/skills/qa-setup/SKILL.md): prepare a project once; check Node, npx and ffmpeg, register the browser, write .qa/config.json
-- [write-test-plan](https://github.com/he1ox/AgenticTestRunner/blob/main/skills/write-test-plan/SKILL.md): turn a ticket into .qa/plans/<KEY>.plan.json and get the case list approved
+- [write-test-plan](https://github.com/he1ox/AgenticTestRunner/blob/main/skills/write-test-plan/SKILL.md): turn a ticket, a spec or a request in chat into .qa/plans/<KEY>.plan.json and get the case list approved
 - [run-test-plan](https://github.com/he1ox/AgenticTestRunner/blob/main/skills/run-test-plan/SKILL.md): run the plan with browser agents, open the viewer, retest what a reviewer rejects
 - [replay-test-plan](https://github.com/he1ox/AgenticTestRunner/blob/main/skills/replay-test-plan/SKILL.md): replay saved Test plans without an agent, repair stale scripts
 

@@ -1,6 +1,6 @@
 ---
 name: run-test-plan
-description: Use when asked to execute QA test cases or a test plan (an issue-tracker test ticket, "run the test cases", "corre los test cases", "ejecuta el plan", retest a ticket) against a web app with browser agents, with a local viewer showing each case's result, evidence, and optional recording. Also use to reopen the viewer or retest the cases a reviewer rejected.
+description: Use when asked to execute QA test cases or a test plan (an issue-tracker test ticket, a spec, "test the checkout flow", "run the test cases", "corre los test cases", "ejecuta el plan", retest a ticket) against a web app with browser agents, with a local viewer showing each case's result, evidence, and optional recording. Also use to reopen the viewer or retest the cases a reviewer rejected.
 license: MIT
 compatibility: Any agent that runs shell commands (Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Copilot CLI…). Needs Node.js 20+, npx for the Playwright MCP browser server, and ffmpeg only for recordings.
 metadata:

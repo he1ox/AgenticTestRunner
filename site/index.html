@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>qa-runner: test cases run by browser agents, signed off by you</title>
-  <meta name="description" content="Agent skills for the coding agent you already use. qa-runner runs your manual test cases in a real browser, backs every verdict with marked screenshots and a recording, and replays what you approve at $0.">
+  <title>qa-runner: what you want tested, run by browser agents, signed off by you</title>
+  <meta name="description" content="Agent skills for the coding agent you already use. qa-runner tests one flow or your whole app in a real browser, backs every verdict with marked screenshots and a recording, and replays what you approve at $0.">
   <meta property="og:title" content="qa-runner">
-  <meta property="og:description" content="Your test cases. Run by browser agents. Signed off by you.">
+  <meta property="og:description" content="What you want tested. Run by browser agents. Signed off by you.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary">
   <meta name="color-scheme" content="light">
@@ -42,14 +42,14 @@
         <div><dt>Deps</dt><dd>0 npm</dd></div>
         <div><dt>Harnesses</dt><dd>7</dd></div>
       </dl>
-      <h1 class="display">Your test cases.<br>Run by browser agents.<br><mark>Signed off by you.</mark></h1>
-      <p class="lede">Agent skills for the coding agent you already use. Give it a ticket: it drafts the test cases for your approval, runs each one in a real browser, and backs every verdict with marked screenshots and a recording.</p>
+      <h1 class="display">What you want tested.<br>Run by browser agents.<br><mark>Signed off by you.</mark></h1>
+      <p class="lede">Agent skills for the coding agent you already use. Point it at one flow or the whole app, from a ticket, a spec or a sentence in chat: it drafts the test cases for your approval, runs each one in a real browser, and backs every verdict with marked screenshots and a recording.</p>
       <div class="cta">
         <div class="cmd mono">
           <code id="install-cmd">npx skills add he1ox/AgenticTestRunner</code>
           <button class="copy" data-copy="install-cmd" aria-label="Copy install command">Copy</button>
         </div>
-        <p class="hint mono">Then ask your agent to “run the test cases for SHOP-42”.</p>
+        <p class="hint mono">Then ask your agent to “test the checkout flow” or “run the test cases for SHOP-42”.</p>
       </div>
     </section>
 
@@ -179,7 +179,7 @@
             <tr><th scope="col"></th><th scope="col" class="us">qa-runner</th><th scope="col">Playwright Test Agents</th><th scope="col">AI testing platforms</th><th scope="col">General browser agents</th></tr>
           </thead>
           <tbody>
-            <tr><th scope="row">Starts from</th><td class="us">The test cases in a ticket</td><td>Test code to write and repair</td><td>Tests on their platform</td><td>An app to explore</td></tr>
+            <tr><th scope="row">Starts from</th><td class="us">What you want tested, from a ticket, a spec or chat</td><td>Test code to write and repair</td><td>Tests on their platform</td><td>An app to explore</td></tr>
             <tr><th scope="row">You get</th><td class="us">Evidence per case, your verdict, $0 replays</td><td><code>.spec.ts</code> files to own</td><td>Runs under a subscription</td><td>A report of what it found</td></tr>
             <tr><th scope="row">Runs on</th><td class="us">Your machine, with the agent and model you already pay for</td><td>Your machine</td><td>Their platform</td><td>Your machine or theirs</td></tr>
             <tr><th scope="row">Together</th><td class="us">Plans, evidence and memory live as files in your repo</td><td>Approved cases export as <code>.spec.ts</code></td><td>—</td><td>qa-runner adds the plan, evidence check, review and retest</td></tr>

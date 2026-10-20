@@ -4,11 +4,11 @@
 
 ## What it does
 
-The skill turns a test ticket or test plan into `.qa/plans/<KEY>.plan.json`, asks you to approve the case list, then schedules batches of cases with a tier and effort each (in Claude Code: Haiku for short read-only cases, Sonnet for the rest, Haiku failures re-checked on Sonnet) and launches Playwright-driven Test Agents through your agent's own subagents, or runs them inline when it has none. With the Claude Code plugin's browser pool and enough test accounts, several run at once. Agents write a result and evidence (screenshots, optional video) per case. A local viewer at `http://127.0.0.1:4321` shows live progress, a dashboard (pass rate, blocked cases, agent time, cost per run), screenshot annotations, and Approve / Needs retest / Reject buttons. `validate` checks every result for missing evidence and leaked credentials before anyone trusts a verdict. Agents can ask you questions through the viewer; approved answers are remembered for later runs (secrets only as `env:NAME` references).
+The skill turns what you want tested (a ticket, a spec, a pull request, a request in chat, or an existing test plan) into `.qa/plans/<KEY>.plan.json`, asks you to approve the case list, then schedules batches of cases with a tier and effort each (in Claude Code: Haiku for short read-only cases, Sonnet for the rest, Haiku failures re-checked on Sonnet) and launches Playwright-driven Test Agents through your agent's own subagents, or runs them inline when it has none. With the Claude Code plugin's browser pool and enough test accounts, several run at once. Agents write a result and evidence (screenshots, optional video) per case. A local viewer at `http://127.0.0.1:4321` shows live progress, a dashboard (pass rate, blocked cases, agent time, cost per run), screenshot annotations, and Approve / Needs retest / Reject buttons. `validate` checks every result for missing evidence and leaked credentials before anyone trusts a verdict. Agents can ask you questions through the viewer; approved answers are remembered for later runs (secrets only as `env:NAME` references).
 
 ## When to use it
 
-- Executing the test cases of a ticket against a QA / non-prod web app
+- Testing one flow, a feature or the whole app against a QA / non-prod web app, from a ticket, a spec or a request in chat
 - Rerunning only the cases a reviewer marked for retest
 - Comparing a new app against a reference (legacy app, design) case by case
 - Reopening the viewer for a previous run
