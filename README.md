@@ -1,10 +1,18 @@
 # qa-runner
 
-[![skills.sh](https://skills.sh/b/he1ox/AgenticTestRunner)](https://skills.sh/he1ox/AgenticTestRunner)
 [![ci](https://github.com/he1ox/AgenticTestRunner/actions/workflows/ci.yml/badge.svg)](https://github.com/he1ox/AgenticTestRunner/actions/workflows/ci.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/he1ox/AgenticTestRunner/badge)](https://scorecard.dev/viewer/?uri=github.com/he1ox/AgenticTestRunner)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fhe1ox%2FAgenticTestRunner%2Fmain%2F.claude-plugin%2Fplugin.json&query=%24.version&label=version&color=blue)](CHANGELOG.md)
+[![license](https://img.shields.io/github/license/he1ox/AgenticTestRunner)](LICENSE)
+[![node](https://img.shields.io/badge/node-%E2%89%A520-339933?logo=nodedotjs&logoColor=white)](CONTRIBUTING.md#set-up)
+[![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](AGENTS.md#rules)
+<br>
+[![Agent Skills](https://img.shields.io/badge/Agent%20Skills-4%20skills-8A2BE2)](https://agentskills.io/specification)
+[![works with](https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Cursor%20%C2%B7%20Gemini%20CLI%20%C2%B7%20OpenCode%20%C2%B7%20Copilot-555)](#install)
+[![GitHub stars](https://img.shields.io/github/stars/he1ox/AgenticTestRunner?style=flat&logo=github)](https://github.com/he1ox/AgenticTestRunner/stargazers)
+[![last commit](https://img.shields.io/github/last-commit/he1ox/AgenticTestRunner)](https://github.com/he1ox/AgenticTestRunner/commits/main)
+[![Discussions](https://img.shields.io/badge/discussions-ask%20%26%20share-blue?logo=github)](https://github.com/he1ox/AgenticTestRunner/discussions)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 **What you want tested, run by browser agents and signed off by you.**
 ([website](https://he1ox.github.io/AgenticTestRunner/))
